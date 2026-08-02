@@ -1114,90 +1114,7 @@
             zoomDisplay.textContent = Math.round(state.scale * 100) + '%';
         }
 
-        // ---- 地图加载 ----
-        function loadMapFromData(dataURL, mapId, mapName, width, height) {
-            const img = new Image();
-            img.onload = () => {
-                state.mapWidth = img.width;
-                state.mapHeight = img.height;
-                state.mapLoaded = true;
-                state.currentMapId = mapId;
-                const existing = state.maps.find(m => m.id === mapId);
-                if (!existing) {
-                    state.maps.push({ id: mapId, name: mapName || '未命名地图', dataURL: dataURL, width: img.width,
-                        height: img.height });
-                } else {
-                    existing.dataURL = dataURL;
-                    existing.name = mapName || existing.name;
-                    existing.width = img.width;
-                    existing.height = img.height;
-                }
-                saveAllMapsData(state.maps);
-                updateMapSelector();
-                mapImage.src = dataURL;
-                const rect = container.getBoundingClientRect();
-                const pad = 40;
-                const scaleX = (rect.width - pad) / img.width;
-                const scaleY = (rect.height - pad) / img.height;
-                state.scale = clamp(Math.min(scaleX, scaleY), 0.1, 5);
-                state.translateX = (rect.width - img.width * state.scale) / 2;
-                state.translateY = (rect.height - img.height * state.scale) / 2;
-                updateTransform();
-                updateZoomDisplay();
-                emptyHint.classList.remove('show');
-                mapImage.style.width = img.width + 'px';
-                mapImage.style.height = img.height + 'px';
-                loadMarkers();
-                renderMarkers();
-                mapSelector.value = mapId;
-                showToast('✅ 已加载: ' + (mapName || '未命名地图'));
-                loading.classList.add('hidden');
-
-                // ---- ⭐ 地图加载完成后，自动从仓库加载标记数据 ----
-                autoLoadFromRepo();
-            };
-            img.onerror = () => {
-                console.error('❌ 加载地图失败:', mapName);
-                showToast('❌ 加载地图失败: ' + mapName, 2000);
-                loading.classList.add('hidden');
-            };
-            img.src = dataURL;
-        }
-
-        // ---- 从仓库加载地图 ----
-        function loadMapFromRepo(mapConfig) {
-            const filePath = mapConfig.file;
-            console.log('📂 尝试加载地图:', filePath);
-            const img = new Image();
-            img.onload = () => {
-                console.log('✅ 地图加载成功:', filePath);
-                const mapId = generateMapId();
-                const mapName = mapConfig.name || filePath.replace(/\.[^.]+$/, '');
-                
-                // ⭐ 直接存储原始 URL，不再转换成 DataURL
-                state.maps.push({ 
-                    id: mapId, 
-                    name: mapName, 
-                    dataURL: filePath,  // 直接使用远程 URL
-                    width: img.width, 
-                    height: img.height 
-                });
-                
-                if (state.maps.length === 1) {
-                    // 直接使用远程 URL 加载地图
-                    loadMapFromUrl(filePath, mapId, mapName, img.width, img.height);
-                }
-                imageLoadCount++;
-                checkAllImagesLoaded();
-            };
-            img.onerror = () => {
-                console.warn('⚠️ 加载地图失败:', filePath);
-                imageLoadCount++;
-                checkAllImagesLoaded();
-            };
-            img.src = filePath;
-        }
-        // ⭐ 新增：直接从 URL 加载地图
+        // ---- 地图加载（从远程URL直接加载）----
         function loadMapFromUrl(imageUrl, mapId, mapName, width, height) {
             state.mapWidth = width;
             state.mapHeight = height;
@@ -1242,6 +1159,79 @@
             // 自动加载仓库数据
             autoLoadFromRepo();
         }
+
+        // ---- 地图加载（从DataURL本地数据加载，用于用户导入的图片）----
+        function loadMapFromData(dataURL, mapId, mapName, width, height) {
+            state.mapWidth = width;
+            state.mapHeight = height;
+            state.mapLoaded = true;
+            state.currentMapId = mapId;
+            const existing = state.maps.find(m => m.id === mapId);
+            if (!existing) {
+                state.maps.push({ id: mapId, name: mapName || '未命名地图', dataURL: dataURL, width: width, height: height });
+            } else {
+                existing.dataURL = dataURL;
+                existing.name = mapName || existing.name;
+                existing.width = width;
+                existing.height = height;
+            }
+            saveAllMapsData(state.maps);
+            updateMapSelector();
+            mapImage.src = dataURL;
+            mapImage.style.width = width + 'px';
+            mapImage.style.height = height + 'px';
+            const rect = container.getBoundingClientRect();
+            const pad = 40;
+            const scaleX = (rect.width - pad) / width;
+            const scaleY = (rect.height - pad) / height;
+            state.scale = clamp(Math.min(scaleX, scaleY), 0.1, 5);
+            state.translateX = (rect.width - width * state.scale) / 2;
+            state.translateY = (rect.height - height * state.scale) / 2;
+            updateTransform();
+            updateZoomDisplay();
+            emptyHint.classList.remove('show');
+            loadMarkers();
+            renderMarkers();
+            mapSelector.value = mapId;
+            showToast('✅ 已加载: ' + (mapName || '未命名地图'));
+            loading.classList.add('hidden');
+            autoLoadFromRepo();
+        }
+
+        // ---- 从仓库加载地图（直接使用远程URL，不经过Canvas转换）----
+        function loadMapFromRepo(mapConfig) {
+            const filePath = mapConfig.file;
+            console.log('📂 尝试加载地图:', filePath);
+            const img = new Image();
+            img.onload = () => {
+                console.log('✅ 地图加载成功:', filePath);
+                const mapId = generateMapId();
+                const mapName = mapConfig.name || filePath.replace(/\.[^.]+$/, '');
+                
+                // 直接存储远程 URL，不再转换成 DataURL
+                state.maps.push({ 
+                    id: mapId, 
+                    name: mapName, 
+                    dataURL: filePath,
+                    width: img.width, 
+                    height: img.height 
+                });
+                
+                if (state.maps.length === 1) {
+                    // 直接使用远程 URL 加载地图
+                    loadMapFromUrl(filePath, mapId, mapName, img.width, img.height);
+                }
+                imageLoadCount++;
+                checkAllImagesLoaded();
+            };
+            img.onerror = () => {
+                console.warn('⚠️ 加载地图失败:', filePath);
+                imageLoadCount++;
+                checkAllImagesLoaded();
+            };
+            img.src = filePath;
+        }
+
         // ---- 检查所有图片是否加载完成 ----
         function checkAllImagesLoaded() {
             console.log('📊 加载进度:', imageLoadCount, '/', totalImagesToLoad);
@@ -1255,7 +1245,12 @@
                     saveAllMapsData(state.maps);
                     if (!state.mapLoaded && state.maps.length > 0) {
                         const first = state.maps[0];
-                        loadMapFromData(first.dataURL, first.id, first.name, first.width, first.height);
+                        // 判断是远程 URL 还是 DataURL
+                        if (first.dataURL && (first.dataURL.startsWith('http://') || first.dataURL.startsWith('https://'))) {
+                            loadMapFromUrl(first.dataURL, first.id, first.name, first.width, first.height);
+                        } else {
+                            loadMapFromData(first.dataURL, first.id, first.name, first.width, first.height);
+                        }
                     }
                 }
             }
@@ -1297,7 +1292,6 @@
             }
 
             // 检查是否已经有标记数据（避免重复加载覆盖用户手动导入的数据）
-            // 但如果 localStorage 为空，说明是首次加载，自动从仓库读取
             const hasLocalData = localStorage.getItem(storageKey(state.currentMapId));
             if (hasLocalData && state.markers.length > 0) {
                 console.log('📂 已有本地标记数据，跳过自动加载');
@@ -1318,7 +1312,6 @@
                 })
                 .then(data => {
                     console.log('✅ 成功加载仓库数据:', data);
-                    // 检查数据是否匹配当前地图
                     if (data.mapId && data.mapId !== state.currentMapId) {
                         console.log('⚠️ 数据中的地图ID不匹配，尝试按坐标导入');
                     }
@@ -1387,14 +1380,12 @@
                     return false;
                 }
 
-                // 检查是否已有标记，给出提示
                 if (state.markers.length > 0 && !silent) {
                     if (!confirm(`当前有 ${state.markers.length} 个标记，导入将覆盖它们。\n\n继续吗？`)) {
                         return false;
                     }
                 }
 
-                // 检查地图尺寸是否匹配
                 if (data.mapWidth && data.mapHeight) {
                     if (data.mapWidth !== state.mapWidth || data.mapHeight !== state.mapHeight) {
                         console.warn('⚠️ 地图尺寸不匹配，标记位置可能偏移');
@@ -1447,35 +1438,13 @@
             const mapData = state.maps.find(m => m.id === mapId);
             if (!mapData) { showToast('❌ 找不到地图数据', 1500); return; }
             if (state.currentMapId && state.mapLoaded) saveMarkers();
-            const img = new Image();
-            img.onload = () => {
-                state.mapWidth = img.width;
-                state.mapHeight = img.height;
-                state.mapLoaded = true;
-                state.currentMapId = mapId;
-                mapImage.src = mapData.dataURL;
-                const rect = container.getBoundingClientRect();
-                const pad = 40;
-                const scaleX = (rect.width - pad) / img.width;
-                const scaleY = (rect.height - pad) / img.height;
-                state.scale = clamp(Math.min(scaleX, scaleY), 0.1, 5);
-                state.translateX = (rect.width - img.width * state.scale) / 2;
-                state.translateY = (rect.height - img.height * state.scale) / 2;
-                updateTransform();
-                updateZoomDisplay();
-                mapImage.style.width = img.width + 'px';
-                mapImage.style.height = img.height + 'px';
-                emptyHint.classList.remove('show');
-                loadMarkers();
-                renderMarkers();
-                mapSelector.value = mapId;
-                showToast('✅ 已加载: ' + mapData.name);
-                loading.classList.add('hidden');
-
-                // ---- 自动加载仓库数据 ----
-                autoLoadFromRepo();
-            };
-            img.src = mapData.dataURL;
+            
+            // 判断是远程 URL 还是本地 DataURL
+            if (mapData.dataURL && (mapData.dataURL.startsWith('http://') || mapData.dataURL.startsWith('https://'))) {
+                loadMapFromUrl(mapData.dataURL, mapId, mapData.name, mapData.width, mapData.height);
+            } else {
+                loadMapFromData(mapData.dataURL, mapId, mapData.name, mapData.width, mapData.height);
+            }
         }
 
         // ---- 更新地图选择器 ----
@@ -1892,7 +1861,7 @@
             emptyHint.classList.add('show');
             renderMarkers();
             updateMapSelector();
-            localStorage.clear(); // 清除缓存，强制重新加载
+            localStorage.clear();
             setTimeout(() => { initFromRepo(); }, 300);
             showToast('🔄 正在刷新资源...', 1500);
         });
@@ -2027,7 +1996,12 @@
                 updateMapSelector();
                 const firstMap = state.maps[0];
                 if (firstMap) {
-                    loadMapFromData(firstMap.dataURL, firstMap.id, firstMap.name, firstMap.width, firstMap.height);
+                    // 判断是远程 URL 还是 DataURL
+                    if (firstMap.dataURL && (firstMap.dataURL.startsWith('http://') || firstMap.dataURL.startsWith('https://'))) {
+                        loadMapFromUrl(firstMap.dataURL, firstMap.id, firstMap.name, firstMap.width, firstMap.height);
+                    } else {
+                        loadMapFromData(firstMap.dataURL, firstMap.id, firstMap.name, firstMap.width, firstMap.height);
+                    }
                 }
                 loading.classList.add('hidden');
             } else {
