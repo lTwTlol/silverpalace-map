@@ -756,13 +756,12 @@
 
         <span class="spacer"></span>
 
-        <!-- ===== 新增：导入/导出数据按钮 ===== -->
+        <!-- ===== 导入/导出数据按钮 ===== -->
         <button class="btn btn-warning" id="btnExportData">📤 导出标记数据</button>
         <div class="file-input-wrap">
             <button class="btn btn-primary">📥 导入标记数据</button>
             <input type="file" id="dataFileInput" accept=".json" />
         </div>
-        <button class="btn btn-primary" id="btnLoadFromRepo">📂 从仓库加载数据</button>
 
         <span class="sep"></span>
 
@@ -833,7 +832,7 @@
     <script>
         // ============================================================
         //  🗺️ 白银之城资源标记工具
-        //  功能：自动加载地图 + 导入/导出标记数据 + 从仓库加载 JSON
+        //  功能：自动加载地图 + 导入/导出标记数据 + 自动加载仓库 JSON
         // ============================================================
 
         // ============================================================
@@ -1153,6 +1152,9 @@
                 mapSelector.value = mapId;
                 showToast('✅ 已加载: ' + (mapName || '未命名地图'));
                 loading.classList.add('hidden');
+
+                // ---- ⭐ 地图加载完成后，自动从仓库加载标记数据 ----
+                autoLoadFromRepo();
             };
             img.onerror = () => {
                 console.error('❌ 加载地图失败:', mapName);
@@ -1236,7 +1238,53 @@
         }
 
         // ============================================================
-        //  ⭐ 新增：导入 / 导出标记数据
+        //  ⭐ 核心：自动从仓库加载 map_editor_state.json
+        // ============================================================
+        function autoLoadFromRepo() {
+            // 等待地图加载完成后再尝试
+            if (!state.mapLoaded) {
+                console.log('⏳ 地图未加载完成，稍后重试...');
+                setTimeout(autoLoadFromRepo, 500);
+                return;
+            }
+
+            // 检查是否已经有标记数据（避免重复加载覆盖用户手动导入的数据）
+            // 但如果 localStorage 为空，说明是首次加载，自动从仓库读取
+            const hasLocalData = localStorage.getItem(storageKey(state.currentMapId));
+            if (hasLocalData && state.markers.length > 0) {
+                console.log('📂 已有本地标记数据，跳过自动加载');
+                return;
+            }
+
+            const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/');
+            const jsonUrl = baseUrl + 'map_editor_state.json';
+
+            console.log('📂 自动从仓库加载:', jsonUrl);
+
+            fetch(jsonUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status + ' - 文件不存在');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('✅ 成功加载仓库数据:', data);
+                    // 检查数据是否匹配当前地图
+                    if (data.mapId && data.mapId !== state.currentMapId) {
+                        console.log('⚠️ 数据中的地图ID不匹配，尝试按坐标导入');
+                    }
+                    if (importMarkers(data, true)) {
+                        showToast('✅ 已从仓库加载标记数据', 2000);
+                    }
+                })
+                .catch(err => {
+                    console.log('ℹ️ 仓库中没有 map_editor_state.json，跳过自动加载');
+                });
+        }
+
+        // ============================================================
+        //  导入 / 导出标记数据
         // ============================================================
 
         // ---- 导出标记数据 ----
@@ -1246,18 +1294,18 @@
                 return;
             }
 
-            // 构建导出数据
             const exportData = {
                 version: '1.0',
                 exportedAt: new Date().toISOString(),
                 mapId: state.currentMapId,
                 mapName: state.maps.find(m => m.id === state.currentMapId)?.name || '未命名',
+                mapWidth: state.mapWidth,
+                mapHeight: state.mapHeight,
                 markers: state.markers,
                 nextId: state.nextId,
                 labelCustomized: state.labelCustomized,
             };
 
-            // 下载为 JSON 文件
             const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -1271,45 +1319,52 @@
         }
 
         // ---- 导入标记数据 ----
-        function importMarkers(jsonData) {
+        function importMarkers(jsonData, silent = false) {
             try {
                 const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
 
-                // 验证数据格式
                 if (!data.markers || !Array.isArray(data.markers)) {
-                    showToast('❌ 无效的数据格式', 1500);
+                    if (!silent) showToast('❌ 无效的数据格式', 1500);
                     return false;
                 }
 
-                // 检查是否当前有地图
                 if (!state.mapLoaded) {
-                    showToast('❌ 请先加载地图', 1500);
+                    if (!silent) showToast('❌ 请先加载地图', 1500);
                     return false;
                 }
 
                 const count = data.markers.length;
                 if (count === 0) {
-                    showToast('⚠️ 数据中没有标记', 1500);
+                    if (!silent) showToast('⚠️ 数据中没有标记', 1500);
                     return false;
                 }
 
-                // 确认覆盖
-                if (state.markers.length > 0) {
+                // 检查是否已有标记，给出提示
+                if (state.markers.length > 0 && !silent) {
                     if (!confirm(`当前有 ${state.markers.length} 个标记，导入将覆盖它们。\n\n继续吗？`)) {
                         return false;
                     }
                 }
 
-                // 导入标记
+                // 检查地图尺寸是否匹配
+                if (data.mapWidth && data.mapHeight) {
+                    if (data.mapWidth !== state.mapWidth || data.mapHeight !== state.mapHeight) {
+                        console.warn('⚠️ 地图尺寸不匹配，标记位置可能偏移');
+                        if (!silent) {
+                            if (!confirm(`⚠️ 地图尺寸不匹配 (数据: ${data.mapWidth}x${data.mapHeight}, 当前: ${state.mapWidth}x${state.mapHeight})\n\n标记位置可能不准确，继续吗？`)) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+
                 state.markers = data.markers.map(m => ({
                     ...m,
-                    // 确保坐标在有效范围内
                     x: clamp(m.x || 0, 0, state.mapWidth),
                     y: clamp(m.y || 0, 0, state.mapHeight),
                 }));
                 state.nextId = data.nextId || Math.max(...state.markers.map(m => m.id), 0) + 1;
 
-                // 导入标签自定义状态
                 if (data.labelCustomized) {
                     state.labelCustomized = data.labelCustomized;
                 } else {
@@ -1321,40 +1376,13 @@
 
                 renderMarkers();
                 saveMarkers();
-                showToast(`✅ 成功导入 ${state.markers.length} 个标记`, 2000);
+                if (!silent) showToast(`✅ 成功导入 ${state.markers.length} 个标记`, 2000);
                 return true;
             } catch (e) {
                 console.error('导入失败:', e);
-                showToast('❌ 导入失败: ' + e.message, 2000);
+                if (!silent) showToast('❌ 导入失败: ' + e.message, 2000);
                 return false;
             }
-        }
-
-        // ---- 从仓库加载 map_editor_state.json ----
-        function loadFromRepo() {
-            // 获取当前页面域名，构建完整 URL
-            const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/');
-            const jsonUrl = baseUrl + 'map_editor_state.json';
-
-            console.log('📂 尝试从仓库加载:', jsonUrl);
-
-            fetch(jsonUrl)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('HTTP ' + response.status + ' - 文件不存在或无法访问');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('✅ 成功加载仓库数据:', data);
-                    if (importMarkers(data)) {
-                        showToast('✅ 已从仓库加载标记数据', 2000);
-                    }
-                })
-                .catch(err => {
-                    console.warn('⚠️ 从仓库加载失败:', err);
-                    showToast('❌ 无法加载仓库数据: ' + err.message, 3000);
-                });
         }
 
         // ---- 切换地图 ----
@@ -1395,6 +1423,9 @@
                 mapSelector.value = mapId;
                 showToast('✅ 已加载: ' + mapData.name);
                 loading.classList.add('hidden');
+
+                // ---- 自动加载仓库数据 ----
+                autoLoadFromRepo();
             };
             img.src = mapData.dataURL;
         }
@@ -1813,18 +1844,13 @@
             emptyHint.classList.add('show');
             renderMarkers();
             updateMapSelector();
+            localStorage.clear(); // 清除缓存，强制重新加载
             setTimeout(() => { initFromRepo(); }, 300);
             showToast('🔄 正在刷新资源...', 1500);
         });
 
-        // ============================================================
-        //  ⭐ 新增：绑定导入/导出按钮事件
-        // ============================================================
-
-        // 导出按钮
+        // ---- 绑定导入/导出按钮 ----
         document.getElementById('btnExportData').addEventListener('click', exportMarkers);
-
-        // 导入按钮（文件选择）
         document.getElementById('dataFileInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -1840,11 +1866,8 @@
                 }
             };
             reader.readAsText(file);
-            e.target.value = ''; // 重置，允许重复选择同一文件
+            e.target.value = '';
         });
-
-        // 从仓库加载按钮
-        document.getElementById('btnLoadFromRepo').addEventListener('click', loadFromRepo);
 
         // ---- 地图选择器 ----
         mapSelector.addEventListener('change', (e) => {
@@ -1944,11 +1967,10 @@
 
         state.showLabels = true;
         console.log('🗺️ 白银之城标记工具');
-        console.log('📋 功能: 自动加载地图 + 导入/导出标记数据');
+        console.log('📋 功能: 自动加载地图 + 自动加载仓库标记数据');
         console.log('📌 右键点击地图 → 添加标记');
         console.log('📤 导出数据 → 保存为 map_editor_state.json');
         console.log('📥 导入数据 → 读取 JSON 文件恢复标记');
-        console.log('📂 从仓库加载 → 读取同目录的 map_editor_state.json');
 
         loadAllMapsData().then(savedMaps => {
             if (savedMaps && savedMaps.length > 0) {
