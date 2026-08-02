@@ -1173,15 +1173,19 @@
                 console.log('✅ 地图加载成功:', filePath);
                 const mapId = generateMapId();
                 const mapName = mapConfig.name || filePath.replace(/\.[^.]+$/, '');
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                const dataURL = canvas.toDataURL('image/png');
-                state.maps.push({ id: mapId, name: mapName, dataURL: dataURL, width: img.width, height: img.height });
+                
+                // ⭐ 直接存储原始 URL，不再转换成 DataURL
+                state.maps.push({ 
+                    id: mapId, 
+                    name: mapName, 
+                    dataURL: filePath,  // 直接使用远程 URL
+                    width: img.width, 
+                    height: img.height 
+                });
+                
                 if (state.maps.length === 1) {
-                    loadMapFromData(dataURL, mapId, mapName, img.width, img.height);
+                    // 直接使用远程 URL 加载地图
+                    loadMapFromUrl(filePath, mapId, mapName, img.width, img.height);
                 }
                 imageLoadCount++;
                 checkAllImagesLoaded();
@@ -1193,7 +1197,51 @@
             };
             img.src = filePath;
         }
-
+        // ⭐ 新增：直接从 URL 加载地图
+        function loadMapFromUrl(imageUrl, mapId, mapName, width, height) {
+            state.mapWidth = width;
+            state.mapHeight = height;
+            state.mapLoaded = true;
+            state.currentMapId = mapId;
+            
+            // 检查是否已存在地图记录
+            const existing = state.maps.find(m => m.id === mapId);
+            if (!existing) {
+                state.maps.push({ id: mapId, name: mapName || '未命名地图', dataURL: imageUrl, width: width, height: height });
+            } else {
+                existing.dataURL = imageUrl;
+                existing.name = mapName || existing.name;
+                existing.width = width;
+                existing.height = height;
+            }
+            
+            saveAllMapsData(state.maps);
+            updateMapSelector();
+            
+            mapImage.src = imageUrl;
+            mapImage.style.width = width + 'px';
+            mapImage.style.height = height + 'px';
+            
+            const rect = container.getBoundingClientRect();
+            const pad = 40;
+            const scaleX = (rect.width - pad) / width;
+            const scaleY = (rect.height - pad) / height;
+            state.scale = clamp(Math.min(scaleX, scaleY), 0.1, 5);
+            state.translateX = (rect.width - width * state.scale) / 2;
+            state.translateY = (rect.height - height * state.scale) / 2;
+            updateTransform();
+            updateZoomDisplay();
+            emptyHint.classList.remove('show');
+            
+            loadMarkers();
+            renderMarkers();
+            mapSelector.value = mapId;
+            showToast('✅ 已加载: ' + (mapName || '未命名地图'));
+            loading.classList.add('hidden');
+            
+            // 自动加载仓库数据
+            autoLoadFromRepo();
+        }
         // ---- 检查所有图片是否加载完成 ----
         function checkAllImagesLoaded() {
             console.log('📊 加载进度:', imageLoadCount, '/', totalImagesToLoad);
