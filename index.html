@@ -840,7 +840,11 @@
             ]
         };
 
-  
+        // ---- ⚠️ 修复：补充 FALLBACK_ICONS 定义 ----
+        const FALLBACK_ICONS = [
+            { id: 'emoji', label: '❓', emoji: '❓' },
+            { id: 'emoji_star', label: '⭐', emoji: '⭐' },
+            { id: 'emoji_flag', label: '🚩', emoji: '🚩' },
         ];
 
         // ============================================================
@@ -1233,6 +1237,7 @@
                 loading.classList.add('hidden');
             };
             img.onerror = () => {
+                console.error('❌ 加载地图失败:', mapName);
                 showToast('❌ 加载地图失败: ' + mapName, 2000);
                 loading.classList.add('hidden');
             };
@@ -1241,11 +1246,12 @@
 
         // ---- 从仓库加载地图 ----
         function loadMapFromRepo(mapConfig) {
-            // 使用相对路径加载图片
-            const img = new Image();
             const filePath = mapConfig.file;
+            console.log('📂 尝试加载地图:', filePath);
 
+            const img = new Image();
             img.onload = () => {
+                console.log('✅ 地图加载成功:', filePath);
                 const mapId = generateMapId();
                 const mapName = mapConfig.name || filePath.replace(/\.[^.]+$/, '');
 
@@ -1275,7 +1281,7 @@
             };
 
             img.onerror = () => {
-                console.warn('⚠️ 加载地图失败:', filePath);
+                console.warn('⚠️ 加载地图失败:', filePath, '请检查文件名和路径');
                 imageLoadCount++;
                 checkAllImagesLoaded();
             };
@@ -1285,12 +1291,13 @@
 
         // ---- 检查所有图片是否加载完成 ----
         function checkAllImagesLoaded() {
+            console.log('📊 加载进度:', imageLoadCount, '/', totalImagesToLoad);
             if (imageLoadCount >= totalImagesToLoad) {
                 // 所有图片加载完成
                 if (state.maps.length === 0) {
                     loading.classList.add('hidden');
                     emptyHint.classList.add('show');
-                    showToast('⚠️ 没有找到地图图片，请检查 MAP_CONFIG', 3000);
+                    showToast('⚠️ 没有找到地图图片，请检查 MAP_CONFIG 和文件名', 3000);
                 } else {
                     updateMapSelector();
                     saveAllMapsData(state.maps);
@@ -1310,8 +1317,17 @@
             loading.classList.remove('hidden');
             imageLoadCount = 0;
 
-            // 计算总图片数
+            // 计算总图片数（地图 + 图标）
             totalImagesToLoad = MAP_CONFIG.maps.length + MAP_CONFIG.icons.length;
+            console.log('📦 总资源数:', totalImagesToLoad);
+
+            if (totalImagesToLoad === 0) {
+                loading.classList.add('hidden');
+                emptyHint.classList.add('show');
+                updateMapSelector();
+                showToast('⚠️ 没有配置任何资源', 2000);
+                return;
+            }
 
             // 1. 加载地图
             for (const map of MAP_CONFIG.maps) {
@@ -1322,21 +1338,16 @@
             for (const icon of MAP_CONFIG.icons) {
                 const img = new Image();
                 img.onload = () => {
+                    console.log('✅ 图标加载成功:', icon.file);
                     imageLoadCount++;
                     checkAllImagesLoaded();
                 };
                 img.onerror = () => {
+                    console.warn('⚠️ 图标加载失败:', icon.file);
                     imageLoadCount++;
                     checkAllImagesLoaded();
                 };
                 img.src = icon.file;
-            }
-
-            // 如果没有任何资源，直接隐藏 loading
-            if (totalImagesToLoad === 0) {
-                loading.classList.add('hidden');
-                emptyHint.classList.add('show');
-                updateMapSelector();
             }
         }
 
@@ -2005,7 +2016,8 @@
 
         state.showLabels = true;
         console.log('🗺️ 二游地图标记工具 · 自动加载仓库资源版');
-        console.log('📋 请在 MAP_CONFIG 中配置你的地图和图标');
+        console.log('📋 配置的地图:', MAP_CONFIG.maps);
+        console.log('📋 配置的图标:', MAP_CONFIG.icons);
         console.log('📌 右键点击地图 → 添加标记');
         console.log('🖱️ 拖拽标记 → 移动位置');
         console.log('🖱️ 单击标记 → 编辑');
@@ -2013,7 +2025,7 @@
         // 尝试加载之前保存的地图数据
         loadAllMapsData().then(savedMaps => {
             if (savedMaps && savedMaps.length > 0) {
-                // 有保存的数据，使用保存的数据
+                console.log('📂 找到已保存的地图数据:', savedMaps.length, '张');
                 state.maps = savedMaps;
                 updateMapSelector();
 
@@ -2023,6 +2035,7 @@
                 }
                 loading.classList.add('hidden');
             } else {
+                console.log('📂 没有已保存的地图，从仓库加载...');
                 // 没有保存的数据，从仓库加载
                 initFromRepo();
             }
