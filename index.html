@@ -90,6 +90,14 @@
             transform: scale(1.03);
             box-shadow: 0 4px 20px rgba(52, 211, 153, 0.4);
         }
+        .toolbar .btn-warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff;
+        }
+        .toolbar .btn-warning:hover {
+            transform: scale(1.03);
+            box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+        }
         .toolbar .zoom-info {
             font-size: 13px;
             color: #aaa;
@@ -721,7 +729,7 @@
 
     <!-- 工具栏 -->
     <header class="toolbar">
-        <span class="brand">🗺️ 标记工具</span>
+        <span class="brand">🗺️ 白银之城标记</span>
         <span class="sep"></span>
 
         <!-- 地图选择器 -->
@@ -735,7 +743,7 @@
         <span class="sep"></span>
 
         <div class="file-input-wrap">
-            <button class="btn btn-success">📥 导入新地图</button>
+            <button class="btn btn-success">📥 导入地图</button>
             <input type="file" id="mapFileInput" accept="image/*" />
         </div>
 
@@ -748,10 +756,20 @@
 
         <span class="spacer"></span>
 
+        <!-- ===== 新增：导入/导出数据按钮 ===== -->
+        <button class="btn btn-warning" id="btnExportData">📤 导出标记数据</button>
+        <div class="file-input-wrap">
+            <button class="btn btn-primary">📥 导入标记数据</button>
+            <input type="file" id="dataFileInput" accept=".json" />
+        </div>
+        <button class="btn btn-primary" id="btnLoadFromRepo">📂 从仓库加载数据</button>
+
+        <span class="sep"></span>
+
         <button class="btn" id="btnToggleLabels">🏷️ 标签</button>
         <button class="btn" id="btnDeleteMap" style="color:#f87171;">🗑️ 删除地图</button>
         <button class="btn" id="btnClearAll" style="color:#f87171;">🧹 清空标记</button>
-        <button class="btn btn-primary" id="btnReload">🔄 刷新资源</button>
+        <button class="btn" id="btnReload">🔄 刷新资源</button>
     </header>
 
     <!-- 地图容器 -->
@@ -763,7 +781,7 @@
         <div class="empty-hint show" id="emptyHint">
             <span class="big">🖼️</span>
             请导入游戏全景地图<br />
-            <span class="sub">点击「导入新地图」或拖拽图片到窗口</span>
+            <span class="sub">点击「导入地图」或拖拽图片到窗口</span>
         </div>
     </div>
 
@@ -814,22 +832,17 @@
 
     <script>
         // ============================================================
-        //  🗺️ 二游地图标记工具 - 自动加载仓库资源版
-        //  使用说明：在下方 MAP_CONFIG 中配置你的地图和图标
+        //  🗺️ 白银之城资源标记工具
+        //  功能：自动加载地图 + 导入/导出标记数据 + 从仓库加载 JSON
         // ============================================================
 
         // ============================================================
-        //  📋 在这里配置你的地图和图标！（重要！！！）
+        //  📋 配置你的地图和图标
         // ============================================================
         const MAP_CONFIG = {
-            // ---- 地图列表 ----
             maps: [
-                // 每张地图：{ name: "显示名称", file: "文件名.png" }
-                { name: '我的地图', file: 'map.png' },
-                // 添加更多地图...
+                { name: '白银之城', file: 'map.png' },
             ],
-
-            // ---- 图标列表（自动从仓库加载图片） ----
             icons: [
                 { id: '信箱', label: '信箱', file: '信箱.png' },
                 { id: '包裹', label: '包裹', file: '包裹.png' },
@@ -840,34 +853,18 @@
             ]
         };
 
-        // ---- ⚠️ 修复：补充 FALLBACK_ICONS 定义 ----
         const FALLBACK_ICONS = [
             { id: 'emoji', label: '❓', emoji: '❓' },
             { id: 'emoji_star', label: '⭐', emoji: '⭐' },
             { id: 'emoji_flag', label: '🚩', emoji: '🚩' },
         ];
 
-        // ============================================================
-        //  以下代码自动运行，无需修改
-        // ============================================================
-
-        // ---- 构建完整图标列表 ----
+        // ---- 构建图标列表 ----
         let ICON_LIST = [];
-
-        function buildIconList() {
-            ICON_LIST = [];
-            // 先从配置加载
-            for (const icon of MAP_CONFIG.icons) {
-                ICON_LIST.push({ ...icon });
-            }
-            // 添加 fallback emoji
-            for (const fallback of FALLBACK_ICONS) {
-                if (!ICON_LIST.find(i => i.id === fallback.id)) {
-                    ICON_LIST.push({ ...fallback });
-                }
-            }
+        for (const icon of MAP_CONFIG.icons) ICON_LIST.push({ ...icon });
+        for (const fallback of FALLBACK_ICONS) {
+            if (!ICON_LIST.find(i => i.id === fallback.id)) ICON_LIST.push({ ...fallback });
         }
-        buildIconList();
 
         // ---- 状态 ----
         let state = {
@@ -895,18 +892,15 @@
         const markerContainer = document.getElementById('marker-container');
         const emptyHint = document.getElementById('emptyHint');
         const loading = document.getElementById('loading');
-
         const zoomDisplay = document.getElementById('zoomDisplay');
         const contextMenu = document.getElementById('context-menu');
         const editPanel = document.getElementById('edit-panel');
-
         const iconGrid = document.getElementById('iconGrid');
         const editLabel = document.getElementById('editLabel');
         const editNote = document.getElementById('editNote');
         const editSize = document.getElementById('editSize');
         const sizeValue = document.getElementById('sizeValue');
         const toast = document.getElementById('toast');
-
         const mapSelector = document.getElementById('mapSelector');
         const mapCount = document.getElementById('mapCount');
 
@@ -914,14 +908,11 @@
         let imageLoadCount = 0;
         let totalImagesToLoad = 0;
 
-        // ---- Toast ----
         function showToast(msg, duration = 2000) {
             toast.textContent = msg;
             toast.classList.add('show');
             clearTimeout(toastTimer);
-            toastTimer = setTimeout(() => {
-                toast.classList.remove('show');
-            }, duration);
+            toastTimer = setTimeout(() => { toast.classList.remove('show'); }, duration);
         }
 
         // ---- IndexedDB 工具 ----
@@ -949,20 +940,13 @@
                 const tx = db.transaction(STORE_NAME, 'readwrite');
                 const store = tx.objectStore(STORE_NAME);
                 await new Promise((resolve, reject) => {
-                    const req = store.put({
-                        id: 'allMaps',
-                        maps: maps,
-                        timestamp: Date.now()
-                    });
+                    const req = store.put({ id: 'allMaps', maps: maps, timestamp: Date.now() });
                     req.onsuccess = resolve;
                     req.onerror = () => reject(req.error);
                 });
                 db.close();
                 return true;
-            } catch (e) {
-                console.warn('保存地图列表失败:', e);
-                return false;
-            }
+            } catch (e) { console.warn('保存地图列表失败:', e); return false; }
         }
 
         async function loadAllMapsData() {
@@ -977,55 +961,35 @@
                 });
                 db.close();
                 return data ? data.maps : null;
-            } catch (e) {
-                console.warn('读取地图列表失败:', e);
-                return null;
-            }
+            } catch (e) { console.warn('读取地图列表失败:', e); return null; }
         }
 
-        // ---- 工具函数 ----
         function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
         function genId() { return state.nextId++; }
 
-        function storageKey(mapId) {
-            return 'map_markers_' + mapId;
-        }
+        function storageKey(mapId) { return 'map_markers_' + mapId; }
 
-        function labelCustomizedKey(mapId) {
-            return 'map_label_customized_' + mapId;
-        }
+        function labelCustomizedKey(mapId) { return 'map_label_customized_' + mapId; }
 
-        function generateMapId() {
-            return 'map_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-        }
+        function generateMapId() { return 'map_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }
 
-        // ---- 坐标转换 ----
         function mapToView(mapX, mapY) {
-            return {
-                x: mapX * state.scale + state.translateX,
-                y: mapY * state.scale + state.translateY,
-            };
+            return { x: mapX * state.scale + state.translateX, y: mapY * state.scale + state.translateY };
         }
 
         function viewToMap(vx, vy) {
-            return {
-                x: (vx - state.translateX) / state.scale,
-                y: (vy - state.translateY) / state.scale,
-            };
+            return { x: (vx - state.translateX) / state.scale, y: (vy - state.translateY) / state.scale };
         }
 
         // ---- 渲染标记 ----
         function renderMarkers() {
             markerContainer.innerHTML = '';
             if (!state.mapLoaded) return;
-
             const sorted = [...state.markers].sort((a, b) => a.id - b.id);
-
             for (const m of sorted) {
                 const pos = mapToView(m.x, m.y);
                 const size = m.size || 32;
-
                 const el = document.createElement('div');
                 el.className = 'marker';
                 el.dataset.id = m.id;
@@ -1033,22 +997,18 @@
                 el.style.top = pos.y + 'px';
                 el.style.width = size + 'px';
                 el.style.height = size + 'px';
-
                 const wrap = document.createElement('div');
                 wrap.className = 'icon-wrap';
                 wrap.style.width = size + 'px';
                 wrap.style.height = size + 'px';
                 wrap.style.fontSize = (size * 0.7) + 'px';
-
                 const iconInfo = ICON_LIST.find(i => i.id === m.icon || i.emoji === m.icon);
                 if (iconInfo && iconInfo.file) {
                     const img = document.createElement('img');
                     img.src = iconInfo.file;
                     img.alt = iconInfo.label;
                     img.draggable = false;
-                    img.onerror = function() {
-                        this.parentElement.innerHTML = `<span class="emoji">❓</span>`;
-                    };
+                    img.onerror = function() { this.parentElement.innerHTML = `<span class="emoji">❓</span>`; };
                     wrap.appendChild(img);
                 } else {
                     const span = document.createElement('span');
@@ -1057,14 +1017,12 @@
                     wrap.appendChild(span);
                 }
                 el.appendChild(wrap);
-
                 if (state.showLabels && m.label) {
                     const labelEl = document.createElement('div');
                     labelEl.className = 'label-text';
                     labelEl.textContent = m.label;
                     el.appendChild(labelEl);
                 }
-
                 el.addEventListener('mousedown', (e) => {
                     if (e.button !== 0) return;
                     e.stopPropagation();
@@ -1072,31 +1030,21 @@
                     const size = m.size || 32;
                     const offsetX = (e.clientX - rect.left) * (size / rect.width);
                     const offsetY = (e.clientY - rect.top) * (size / rect.height);
-                    window._dragData = {
-                        id: m.id,
-                        offsetX: offsetX,
-                        offsetY: offsetY,
-                    };
+                    window._dragData = { id: m.id, offsetX: offsetX, offsetY: offsetY };
                     isDraggingMarker = false;
                 });
-
                 el.addEventListener('click', (e) => {
                     if (isDraggingMarker) return;
                     e.stopPropagation();
                     openEditPanel(m.id);
                 });
-
                 markerContainer.appendChild(el);
             }
-
-            if (state.mapLoaded) {
-                emptyHint.classList.remove('show');
-            }
+            if (state.mapLoaded) emptyHint.classList.remove('show');
         }
 
         // ---- 全局拖拽 ----
         let mapDrag = null;
-
         document.addEventListener('mousemove', (e) => {
             if (window._dragData) {
                 const { id, offsetX, offsetY } = window._dragData;
@@ -1115,7 +1063,6 @@
                 e.preventDefault();
                 return;
             }
-
             if (mapDrag) {
                 const dx = e.clientX - mapDrag.startX;
                 const dy = e.clientY - mapDrag.startY;
@@ -1126,7 +1073,6 @@
                 e.preventDefault();
             }
         });
-
         document.addEventListener('mouseup', () => {
             if (window._dragData) {
                 window._dragData = null;
@@ -1134,47 +1080,33 @@
                 container.classList.remove('grabbing');
                 return;
             }
-            if (mapDrag) {
-                mapDrag = null;
-                container.classList.remove('grabbing');
-            }
+            if (mapDrag) { mapDrag = null;
+                container.classList.remove('grabbing'); }
         });
-
         container.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
             if (e.target.closest('.marker')) return;
             if (e.target.closest('#context-menu')) return;
             if (e.target.closest('#edit-panel')) return;
-            mapDrag = {
-                startX: e.clientX,
-                startY: e.clientY,
-                tx: state.translateX,
-                ty: state.translateY,
-            };
+            mapDrag = { startX: e.clientX, startY: e.clientY, tx: state.translateX, ty: state.translateY };
             container.classList.add('grabbing');
         });
-
-        // ---- 滚轮缩放 ----
         container.addEventListener('wheel', (e) => {
             e.preventDefault();
             const delta = e.deltaY > 0 ? -0.08 : 0.08;
             const newScale = clamp(state.scale * (1 + delta), 0.1, 20);
-
             const rect = container.getBoundingClientRect();
             const mx = e.clientX - rect.left;
             const my = e.clientY - rect.top;
             const mapPos = viewToMap(mx, my);
-
             state.scale = newScale;
             state.translateX = mx - mapPos.x * state.scale;
             state.translateY = my - mapPos.y * state.scale;
-
             updateTransform();
             renderMarkers();
             updateZoomDisplay();
         }, { passive: false });
 
-        // ---- 更新地图图层 ----
         function updateTransform() {
             mapLayer.style.transform = `translate(${state.translateX}px, ${state.translateY}px) scale(${state.scale})`;
         }
@@ -1191,16 +1123,10 @@
                 state.mapHeight = img.height;
                 state.mapLoaded = true;
                 state.currentMapId = mapId;
-
                 const existing = state.maps.find(m => m.id === mapId);
                 if (!existing) {
-                    state.maps.push({
-                        id: mapId,
-                        name: mapName || '未命名地图',
-                        dataURL: dataURL,
-                        width: img.width,
-                        height: img.height,
-                    });
+                    state.maps.push({ id: mapId, name: mapName || '未命名地图', dataURL: dataURL, width: img.width,
+                        height: img.height });
                 } else {
                     existing.dataURL = dataURL;
                     existing.name = mapName || existing.name;
@@ -1209,29 +1135,21 @@
                 }
                 saveAllMapsData(state.maps);
                 updateMapSelector();
-
                 mapImage.src = dataURL;
-
                 const rect = container.getBoundingClientRect();
                 const pad = 40;
-                const availW = rect.width - pad;
-                const availH = rect.height - pad;
-                const scaleX = availW / img.width;
-                const scaleY = availH / img.height;
+                const scaleX = (rect.width - pad) / img.width;
+                const scaleY = (rect.height - pad) / img.height;
                 state.scale = clamp(Math.min(scaleX, scaleY), 0.1, 5);
                 state.translateX = (rect.width - img.width * state.scale) / 2;
                 state.translateY = (rect.height - img.height * state.scale) / 2;
-
                 updateTransform();
                 updateZoomDisplay();
                 emptyHint.classList.remove('show');
-
                 mapImage.style.width = img.width + 'px';
                 mapImage.style.height = img.height + 'px';
-
                 loadMarkers();
                 renderMarkers();
-
                 mapSelector.value = mapId;
                 showToast('✅ 已加载: ' + (mapName || '未命名地图'));
                 loading.classList.add('hidden');
@@ -1248,44 +1166,29 @@
         function loadMapFromRepo(mapConfig) {
             const filePath = mapConfig.file;
             console.log('📂 尝试加载地图:', filePath);
-
             const img = new Image();
             img.onload = () => {
                 console.log('✅ 地图加载成功:', filePath);
                 const mapId = generateMapId();
                 const mapName = mapConfig.name || filePath.replace(/\.[^.]+$/, '');
-
-                // 转换为 dataURL 保存
                 const canvas = document.createElement('canvas');
                 canvas.width = img.width;
                 canvas.height = img.height;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0);
                 const dataURL = canvas.toDataURL('image/png');
-
-                state.maps.push({
-                    id: mapId,
-                    name: mapName,
-                    dataURL: dataURL,
-                    width: img.width,
-                    height: img.height,
-                });
-
-                // 如果是第一张地图，自动加载
+                state.maps.push({ id: mapId, name: mapName, dataURL: dataURL, width: img.width, height: img.height });
                 if (state.maps.length === 1) {
                     loadMapFromData(dataURL, mapId, mapName, img.width, img.height);
                 }
-
                 imageLoadCount++;
                 checkAllImagesLoaded();
             };
-
             img.onerror = () => {
-                console.warn('⚠️ 加载地图失败:', filePath, '请检查文件名和路径');
+                console.warn('⚠️ 加载地图失败:', filePath);
                 imageLoadCount++;
                 checkAllImagesLoaded();
             };
-
             img.src = filePath;
         }
 
@@ -1293,16 +1196,13 @@
         function checkAllImagesLoaded() {
             console.log('📊 加载进度:', imageLoadCount, '/', totalImagesToLoad);
             if (imageLoadCount >= totalImagesToLoad) {
-                // 所有图片加载完成
                 if (state.maps.length === 0) {
                     loading.classList.add('hidden');
                     emptyHint.classList.add('show');
-                    showToast('⚠️ 没有找到地图图片，请检查 MAP_CONFIG 和文件名', 3000);
+                    showToast('⚠️ 没有找到地图图片', 3000);
                 } else {
                     updateMapSelector();
                     saveAllMapsData(state.maps);
-
-                    // 如果没有加载任何地图，加载第一张
                     if (!state.mapLoaded && state.maps.length > 0) {
                         const first = state.maps[0];
                         loadMapFromData(first.dataURL, first.id, first.name, first.width, first.height);
@@ -1313,14 +1213,10 @@
 
         // ---- 初始化：从仓库加载所有资源 ----
         function initFromRepo() {
-            // 显示加载状态
             loading.classList.remove('hidden');
             imageLoadCount = 0;
-
-            // 计算总图片数（地图 + 图标）
             totalImagesToLoad = MAP_CONFIG.maps.length + MAP_CONFIG.icons.length;
             console.log('📦 总资源数:', totalImagesToLoad);
-
             if (totalImagesToLoad === 0) {
                 loading.classList.add('hidden');
                 emptyHint.classList.add('show');
@@ -1328,27 +1224,137 @@
                 showToast('⚠️ 没有配置任何资源', 2000);
                 return;
             }
-
-            // 1. 加载地图
-            for (const map of MAP_CONFIG.maps) {
-                loadMapFromRepo(map);
-            }
-
-            // 2. 加载图标（预加载，确保缓存）
+            for (const map of MAP_CONFIG.maps) loadMapFromRepo(map);
             for (const icon of MAP_CONFIG.icons) {
                 const img = new Image();
-                img.onload = () => {
-                    console.log('✅ 图标加载成功:', icon.file);
-                    imageLoadCount++;
-                    checkAllImagesLoaded();
-                };
-                img.onerror = () => {
-                    console.warn('⚠️ 图标加载失败:', icon.file);
-                    imageLoadCount++;
-                    checkAllImagesLoaded();
-                };
+                img.onload = () => { imageLoadCount++;
+                    checkAllImagesLoaded(); };
+                img.onerror = () => { imageLoadCount++;
+                    checkAllImagesLoaded(); };
                 img.src = icon.file;
             }
+        }
+
+        // ============================================================
+        //  ⭐ 新增：导入 / 导出标记数据
+        // ============================================================
+
+        // ---- 导出标记数据 ----
+        function exportMarkers() {
+            if (!state.mapLoaded || state.markers.length === 0) {
+                showToast('⚠️ 没有标记可导出', 1500);
+                return;
+            }
+
+            // 构建导出数据
+            const exportData = {
+                version: '1.0',
+                exportedAt: new Date().toISOString(),
+                mapId: state.currentMapId,
+                mapName: state.maps.find(m => m.id === state.currentMapId)?.name || '未命名',
+                markers: state.markers,
+                nextId: state.nextId,
+                labelCustomized: state.labelCustomized,
+            };
+
+            // 下载为 JSON 文件
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'map_editor_state.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('📤 已导出 ' + state.markers.length + ' 个标记', 2000);
+        }
+
+        // ---- 导入标记数据 ----
+        function importMarkers(jsonData) {
+            try {
+                const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
+
+                // 验证数据格式
+                if (!data.markers || !Array.isArray(data.markers)) {
+                    showToast('❌ 无效的数据格式', 1500);
+                    return false;
+                }
+
+                // 检查是否当前有地图
+                if (!state.mapLoaded) {
+                    showToast('❌ 请先加载地图', 1500);
+                    return false;
+                }
+
+                const count = data.markers.length;
+                if (count === 0) {
+                    showToast('⚠️ 数据中没有标记', 1500);
+                    return false;
+                }
+
+                // 确认覆盖
+                if (state.markers.length > 0) {
+                    if (!confirm(`当前有 ${state.markers.length} 个标记，导入将覆盖它们。\n\n继续吗？`)) {
+                        return false;
+                    }
+                }
+
+                // 导入标记
+                state.markers = data.markers.map(m => ({
+                    ...m,
+                    // 确保坐标在有效范围内
+                    x: clamp(m.x || 0, 0, state.mapWidth),
+                    y: clamp(m.y || 0, 0, state.mapHeight),
+                }));
+                state.nextId = data.nextId || Math.max(...state.markers.map(m => m.id), 0) + 1;
+
+                // 导入标签自定义状态
+                if (data.labelCustomized) {
+                    state.labelCustomized = data.labelCustomized;
+                } else {
+                    state.labelCustomized = {};
+                    for (const m of state.markers) {
+                        state.labelCustomized[m.id] = false;
+                    }
+                }
+
+                renderMarkers();
+                saveMarkers();
+                showToast(`✅ 成功导入 ${state.markers.length} 个标记`, 2000);
+                return true;
+            } catch (e) {
+                console.error('导入失败:', e);
+                showToast('❌ 导入失败: ' + e.message, 2000);
+                return false;
+            }
+        }
+
+        // ---- 从仓库加载 map_editor_state.json ----
+        function loadFromRepo() {
+            // 获取当前页面域名，构建完整 URL
+            const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/');
+            const jsonUrl = baseUrl + 'map_editor_state.json';
+
+            console.log('📂 尝试从仓库加载:', jsonUrl);
+
+            fetch(jsonUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status + ' - 文件不存在或无法访问');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('✅ 成功加载仓库数据:', data);
+                    if (importMarkers(data)) {
+                        showToast('✅ 已从仓库加载标记数据', 2000);
+                    }
+                })
+                .catch(err => {
+                    console.warn('⚠️ 从仓库加载失败:', err);
+                    showToast('❌ 无法加载仓库数据: ' + err.message, 3000);
+                });
         }
 
         // ---- 切换地图 ----
@@ -1362,48 +1368,35 @@
                 state.currentMapId = null;
                 return;
             }
-
             const mapData = state.maps.find(m => m.id === mapId);
-            if (!mapData) {
-                showToast('❌ 找不到地图数据', 1500);
-                return;
-            }
-
-            if (state.currentMapId && state.mapLoaded) {
-                saveMarkers();
-            }
-
-            loadMapFromData(mapData.dataURL, mapData.id, mapData.name, mapData.width, mapData.height);
-        }
-
-        // ---- 删除地图 ----
-        function deleteCurrentMap() {
-            if (!state.currentMapId) {
-                showToast('⚠️ 没有地图可删除', 1500);
-                return;
-            }
-
-            const mapData = state.maps.find(m => m.id === state.currentMapId);
-            if (!mapData) return;
-
-            if (!confirm(`确定要删除地图 "${mapData.name}" 及其所有标记吗？`)) return;
-
-            localStorage.removeItem(storageKey(state.currentMapId));
-            localStorage.removeItem(labelCustomizedKey(state.currentMapId));
-
-            state.maps = state.maps.filter(m => m.id !== state.currentMapId);
-            saveAllMapsData(state.maps);
-
-            state.mapLoaded = false;
-            state.markers = [];
-            state.currentMapId = null;
-            state.labelCustomized = {};
-            mapImage.src = '';
-            emptyHint.classList.add('show');
-            renderMarkers();
-
-            updateMapSelector();
-            showToast('🗑️ 已删除地图', 1500);
+            if (!mapData) { showToast('❌ 找不到地图数据', 1500); return; }
+            if (state.currentMapId && state.mapLoaded) saveMarkers();
+            const img = new Image();
+            img.onload = () => {
+                state.mapWidth = img.width;
+                state.mapHeight = img.height;
+                state.mapLoaded = true;
+                state.currentMapId = mapId;
+                mapImage.src = mapData.dataURL;
+                const rect = container.getBoundingClientRect();
+                const pad = 40;
+                const scaleX = (rect.width - pad) / img.width;
+                const scaleY = (rect.height - pad) / img.height;
+                state.scale = clamp(Math.min(scaleX, scaleY), 0.1, 5);
+                state.translateX = (rect.width - img.width * state.scale) / 2;
+                state.translateY = (rect.height - img.height * state.scale) / 2;
+                updateTransform();
+                updateZoomDisplay();
+                mapImage.style.width = img.width + 'px';
+                mapImage.style.height = img.height + 'px';
+                emptyHint.classList.remove('show');
+                loadMarkers();
+                renderMarkers();
+                mapSelector.value = mapId;
+                showToast('✅ 已加载: ' + mapData.name);
+                loading.classList.add('hidden');
+            };
+            img.src = mapData.dataURL;
         }
 
         // ---- 更新地图选择器 ----
@@ -1414,9 +1407,7 @@
                 const opt = document.createElement('option');
                 opt.value = m.id;
                 opt.textContent = m.name + ' (' + m.width + '×' + m.height + ')';
-                if (m.id === state.currentMapId) {
-                    opt.selected = true;
-                }
+                if (m.id === state.currentMapId) opt.selected = true;
                 mapSelector.appendChild(opt);
             }
             mapCount.textContent = state.maps.length + ' 张';
@@ -1426,11 +1417,8 @@
         function saveMarkers() {
             if (!state.mapLoaded || !state.currentMapId) return;
             try {
-                const data = {
-                    markers: state.markers,
-                    nextId: state.nextId,
-                };
-                localStorage.setItem(storageKey(state.currentMapId), JSON.stringify(data));
+                localStorage.setItem(storageKey(state.currentMapId), JSON.stringify({ markers: state.markers, nextId: state
+                        .nextId }));
                 localStorage.setItem(labelCustomizedKey(state.currentMapId), JSON.stringify(state.labelCustomized));
             } catch (e) { /* ignore */ }
         }
@@ -1439,38 +1427,21 @@
             if (!state.mapLoaded || !state.currentMapId) return;
             try {
                 const raw = localStorage.getItem(storageKey(state.currentMapId));
-                if (!raw) {
-                    state.markers = [];
+                if (!raw) { state.markers = [];
                     state.nextId = 1;
-                    state.labelCustomized = {};
-                    return;
-                }
+                    state.labelCustomized = {}; return; }
                 const data = JSON.parse(raw);
                 state.markers = data.markers || [];
                 state.nextId = data.nextId || 1;
-                state.markers = state.markers.filter(m =>
-                    m.x >= 0 && m.x <= state.mapWidth &&
-                    m.y >= 0 && m.y <= state.mapHeight
-                );
-
+                state.markers = state.markers.filter(m => m.x >= 0 && m.x <= state.mapWidth && m.y >= 0 && m.y <= state
+                    .mapHeight);
                 const customRaw = localStorage.getItem(labelCustomizedKey(state.currentMapId));
-                if (customRaw) {
-                    state.labelCustomized = JSON.parse(customRaw);
-                } else {
-                    state.labelCustomized = {};
-                }
-
+                state.labelCustomized = customRaw ? JSON.parse(customRaw) : {};
                 renderMarkers();
             } catch (e) { /* ignore */ }
         }
 
-        // ---- 获取图标对应的默认标签 ----
-        function getDefaultLabel(iconId) {
-            const info = ICON_LIST.find(i => i.id === iconId || i.emoji === iconId);
-            return info ? info.label : '❓';
-        }
-
-        // ---- 备注内容序列化/反序列化 ----
+        // ---- 备注相关 ----
         function getNoteContent() {
             const children = editNote.childNodes;
             let result = [];
@@ -1479,13 +1450,10 @@
                     const text = node.textContent.trim();
                     if (text) result.push({ type: 'text', content: text });
                 } else if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.tagName === 'IMG') {
-                        result.push({ type: 'image', src: node.src });
-                    } else if (node.tagName === 'DIV' && node.classList.contains('note-img-wrap')) {
+                    if (node.tagName === 'IMG') result.push({ type: 'image', src: node.src });
+                    else if (node.tagName === 'DIV' && node.classList.contains('note-img-wrap')) {
                         const img = node.querySelector('img');
-                        if (img) {
-                            result.push({ type: 'image', src: img.src });
-                        }
+                        if (img) result.push({ type: 'image', src: img.src });
                     } else {
                         const text = node.textContent.trim();
                         if (text) result.push({ type: 'text', content: text });
@@ -1499,9 +1467,8 @@
             editNote.innerHTML = '';
             if (!data || data.length === 0) return;
             for (const item of data) {
-                if (item.type === 'text') {
-                    editNote.appendChild(document.createTextNode(item.content));
-                } else if (item.type === 'image' && item.src) {
+                if (item.type === 'text') editNote.appendChild(document.createTextNode(item.content));
+                else if (item.type === 'image' && item.src) {
                     const wrap = document.createElement('div');
                     wrap.className = 'note-img-wrap';
                     const img = document.createElement('img');
@@ -1511,11 +1478,9 @@
                     del.className = 'img-delete';
                     del.textContent = '✕';
                     del.title = '删除图片';
-                    del.addEventListener('click', (e) => {
-                        e.stopPropagation();
+                    del.addEventListener('click', (e) => { e.stopPropagation();
                         wrap.remove();
-                        onNoteChange();
-                    });
+                        onNoteChange(); });
                     wrap.appendChild(img);
                     wrap.appendChild(del);
                     editNote.appendChild(wrap);
@@ -1531,19 +1496,15 @@
                 const id = parseInt(editPanel.dataset.editId);
                 const m = state.markers.find(m => m.id === id);
                 if (!m) return;
-                const content = getNoteContent();
-                m.note = JSON.stringify(content);
+                m.note = JSON.stringify(getNoteContent());
                 saveMarkers();
             }, 200);
         }
 
-        // ---- 粘贴图片 ----
         editNote.addEventListener('paste', (e) => {
             const items = e.clipboardData.items;
-            let hasImage = false;
             for (const item of items) {
                 if (item.type.startsWith('image/')) {
-                    hasImage = true;
                     const file = item.getAsFile();
                     const reader = new FileReader();
                     reader.onload = (ev) => {
@@ -1556,15 +1517,11 @@
                         const del = document.createElement('button');
                         del.className = 'img-delete';
                         del.textContent = '✕';
-                        del.title = '删除图片';
-                        del.addEventListener('click', (e) => {
-                            e.stopPropagation();
+                        del.addEventListener('click', (e) => { e.stopPropagation();
                             wrap.remove();
-                            onNoteChange();
-                        });
+                            onNoteChange(); });
                         wrap.appendChild(img);
                         wrap.appendChild(del);
-
                         const sel = window.getSelection();
                         if (sel.rangeCount > 0) {
                             const range = sel.getRangeAt(0);
@@ -1576,26 +1533,19 @@
                             range.setStartAfter(space);
                             sel.removeAllRanges();
                             sel.addRange(range);
-                        } else {
-                            editNote.appendChild(wrap);
-                            editNote.appendChild(document.createTextNode(' '));
-                        }
+                        } else { editNote.appendChild(wrap);
+                            editNote.appendChild(document.createTextNode(' ')); }
                         onNoteChange();
                         showToast('✅ 图片已粘贴到备注');
                     };
                     reader.readAsDataURL(file);
                 }
             }
-            if (hasImage) {
-                e.preventDefault();
-            }
+            if (e.clipboardData.items.length > 0) e.preventDefault();
         });
-
         editNote.addEventListener('input', onNoteChange);
-        editNote.addEventListener('blur', () => {
-            clearTimeout(noteChangeTimer);
-            onNoteChange();
-        });
+        editNote.addEventListener('blur', () => { clearTimeout(noteChangeTimer);
+            onNoteChange(); });
 
         // ---- 添加标记 ----
         function addMarker(mapX, mapY) {
@@ -1616,7 +1566,6 @@
             openEditPanel(m.id);
         }
 
-        // ---- 删除标记 ----
         function deleteMarker(id) {
             state.markers = state.markers.filter(m => m.id !== id);
             delete state.labelCustomized[id];
@@ -1626,69 +1575,48 @@
             closeEditPanel();
         }
 
-        // ---- 编辑面板 ----
         function openEditPanel(id) {
             const m = state.markers.find(m => m.id === id);
             if (!m) return;
             state.selectedId = id;
-
             renderIconGrid(m.icon);
-
             editLabel.value = m.label || '';
             editLabel.dataset.customized = state.labelCustomized[m.id] ? 'true' : 'false';
-
-            try {
-                const noteData = JSON.parse(m.note || '[]');
-                setNoteContent(noteData);
-            } catch (e) {
-                editNote.innerHTML = m.note || '';
-            }
-
+            try { setNoteContent(JSON.parse(m.note || '[]')); } catch (e) { editNote.innerHTML = m.note || ''; }
             editSize.value = m.size || 32;
             sizeValue.textContent = m.size || 32;
-
             const rect = container.getBoundingClientRect();
             const pos = mapToView(m.x, m.y);
             const panelW = Math.min(420, window.innerWidth - 40);
             const panelH = 540;
-
-            let left = pos.x + 20;
-            let top = pos.y - 40;
-
+            let left = pos.x + 20,
+                top = pos.y - 40;
             if (left + panelW > window.innerWidth - 20) left = pos.x - panelW - 20;
             if (left < 20) left = 20;
             if (top + panelH > window.innerHeight - 80) top = window.innerHeight - panelH - 80;
             if (top < 80) top = 80;
-
             editPanel.style.left = left + 'px';
             editPanel.style.top = top + 'px';
             editPanel.style.display = 'block';
             editPanel.dataset.editId = id;
-
             setTimeout(() => editLabel.focus(), 100);
         }
 
-        function closeEditPanel() {
-            editPanel.style.display = 'none';
-            state.selectedId = null;
-        }
+        function closeEditPanel() { editPanel.style.display = 'none';
+            state.selectedId = null; }
 
         function renderIconGrid(selectedIcon) {
             iconGrid.innerHTML = '';
             for (const info of ICON_LIST) {
                 const div = document.createElement('div');
                 div.className = 'icon-option';
-                if (info.id === selectedIcon || info.emoji === selectedIcon) {
-                    div.classList.add('active');
-                }
+                if (info.id === selectedIcon || info.emoji === selectedIcon) div.classList.add('active');
                 if (info.file) {
                     const img = document.createElement('img');
                     img.src = info.file;
                     img.alt = info.label;
                     img.draggable = false;
-                    img.onerror = function() {
-                        this.parentElement.innerHTML = `<span class="emoji">❓</span>`;
-                    };
+                    img.onerror = function() { this.parentElement.innerHTML = `<span class="emoji">❓</span>`; };
                     div.appendChild(img);
                 } else {
                     const span = document.createElement('span');
@@ -1697,46 +1625,34 @@
                     div.appendChild(span);
                 }
                 div.dataset.iconId = info.id;
-
                 div.addEventListener('click', () => {
                     iconGrid.querySelectorAll('.icon-option').forEach(el => el.classList.remove('active'));
                     div.classList.add('active');
-
                     const id = parseInt(editPanel.dataset.editId);
                     const m = state.markers.find(m => m.id === id);
                     if (!m) return;
-
                     const newIcon = info.id === 'emoji' ? info.emoji : info.id;
                     m.icon = newIcon;
-
-                    const isCustomized = state.labelCustomized[id] || false;
-
-                    if (!isCustomized) {
-                        const defaultLabel = info.label;
-                        m.label = defaultLabel;
-                        editLabel.value = defaultLabel;
+                    if (!state.labelCustomized[id]) {
+                        m.label = info.label;
+                        editLabel.value = info.label;
                     }
-
                     renderMarkers();
                     saveMarkers();
                 });
-
                 iconGrid.appendChild(div);
             }
         }
 
-        // ---- 实时更新 ----
         editLabel.addEventListener('input', () => {
             const id = parseInt(editPanel.dataset.editId);
             const m = state.markers.find(m => m.id === id);
             if (!m) return;
-            const newLabel = editLabel.value.trim() || '标记';
-            m.label = newLabel;
+            m.label = editLabel.value.trim() || '标记';
             state.labelCustomized[id] = true;
             renderMarkers();
             saveMarkers();
         });
-
         editSize.addEventListener('input', () => {
             sizeValue.textContent = editSize.value;
             const id = parseInt(editPanel.dataset.editId);
@@ -1747,15 +1663,12 @@
             saveMarkers();
         });
 
-        // ---- 复位视图 ----
         function resetView() {
             if (!state.mapLoaded) return;
             const rect = container.getBoundingClientRect();
             const pad = 40;
-            const availW = rect.width - pad;
-            const availH = rect.height - pad;
-            const scaleX = availW / state.mapWidth;
-            const scaleY = availH / state.mapHeight;
+            const scaleX = (rect.width - pad) / state.mapWidth;
+            const scaleY = (rect.height - pad) / state.mapHeight;
             state.scale = clamp(Math.min(scaleX, scaleY), 0.1, 5);
             state.translateX = (rect.width - state.mapWidth * state.scale) / 2;
             state.translateY = (rect.height - state.mapHeight * state.scale) / 2;
@@ -1764,17 +1677,15 @@
             renderMarkers();
         }
 
-        // ---- 切换标签 ----
         function toggleLabels() {
             state.showLabels = !state.showLabels;
             renderMarkers();
             document.getElementById('btnToggleLabels').style.opacity = state.showLabels ? '1' : '0.4';
         }
 
-        // ---- 清空标记 ----
         function clearAllMarkers() {
             if (!state.mapLoaded || state.markers.length === 0) return;
-            if (!confirm('⚠️ 确定要清空当前地图的所有标记吗？此操作不可撤销！')) return;
+            if (!confirm('⚠️ 确定要清空当前地图的所有标记吗？')) return;
             state.markers = [];
             state.labelCustomized = {};
             renderMarkers();
@@ -1783,36 +1694,49 @@
             showToast('🧹 已清空所有标记', 1500);
         }
 
+        function deleteCurrentMap() {
+            if (!state.currentMapId) { showToast('⚠️ 没有地图可删除', 1500); return; }
+            const mapData = state.maps.find(m => m.id === state.currentMapId);
+            if (!mapData) return;
+            if (!confirm(`确定要删除地图 "${mapData.name}" 及其所有标记吗？`)) return;
+            localStorage.removeItem(storageKey(state.currentMapId));
+            localStorage.removeItem(labelCustomizedKey(state.currentMapId));
+            state.maps = state.maps.filter(m => m.id !== state.currentMapId);
+            saveAllMapsData(state.maps);
+            state.mapLoaded = false;
+            state.markers = [];
+            state.currentMapId = null;
+            state.labelCustomized = {};
+            mapImage.src = '';
+            emptyHint.classList.add('show');
+            renderMarkers();
+            updateMapSelector();
+            showToast('🗑️ 已删除地图', 1500);
+        }
+
         // ---- 右键菜单 ----
         let contextPos = { x: 0, y: 0 };
-
         container.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             if (!state.mapLoaded) return;
             if (e.target.closest('.marker')) return;
             if (e.target.closest('#edit-panel')) return;
-
             contextPos.x = e.clientX;
             contextPos.y = e.clientY;
-
             const menuW = 180,
                 menuH = 100;
-            let left = e.clientX;
-            let top = e.clientY;
+            let left = e.clientX,
+                top = e.clientY;
             if (left + menuW > window.innerWidth - 10) left = window.innerWidth - menuW - 10;
             if (top + menuH > window.innerHeight - 10) top = window.innerHeight - menuH - 10;
             if (left < 10) left = 10;
             if (top < 60) top = 60;
-
             contextMenu.style.left = left + 'px';
             contextMenu.style.top = top + 'px';
             contextMenu.style.display = 'block';
         });
-
         document.addEventListener('click', (e) => {
-            if (!contextMenu.contains(e.target)) {
-                contextMenu.style.display = 'none';
-            }
+            if (!contextMenu.contains(e.target)) contextMenu.style.display = 'none';
             if (editPanel.style.display === 'block') {
                 const isClickInsidePanel = editPanel.contains(e.target);
                 const isClickOnMarker = e.target.closest('.marker');
@@ -1823,7 +1747,6 @@
                 }
             }
         });
-
         document.getElementById('ctxAddMarker').addEventListener('click', () => {
             contextMenu.style.display = 'none';
             if (!state.mapLoaded) return;
@@ -1836,10 +1759,7 @@
                 addMarker(mapPos.x, mapPos.y);
             }
         });
-
-        document.getElementById('ctxCancel').addEventListener('click', () => {
-            contextMenu.style.display = 'none';
-        });
+        document.getElementById('ctxCancel').addEventListener('click', () => { contextMenu.style.display = 'none'; });
 
         // ---- 面板事件 ----
         document.getElementById('panelClose').addEventListener('click', closeEditPanel);
@@ -1847,20 +1767,17 @@
             const id = parseInt(editPanel.dataset.editId);
             if (id) deleteMarker(id);
         });
-
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeEditPanel();
-                contextMenu.style.display = 'none';
-            }
+            if (e.key === 'Escape') { closeEditPanel();
+                contextMenu.style.display = 'none'; }
         });
 
         // ---- 工具栏按钮 ----
         document.getElementById('btnZoomIn').addEventListener('click', () => {
             state.scale = clamp(state.scale * 1.2, 0.1, 20);
             const rect = container.getBoundingClientRect();
-            const cx = rect.width / 2;
-            const cy = rect.height / 2;
+            const cx = rect.width / 2,
+                cy = rect.height / 2;
             const mapPos = viewToMap(cx, cy);
             state.translateX = cx - mapPos.x * state.scale;
             state.translateY = cy - mapPos.y * state.scale;
@@ -1868,12 +1785,11 @@
             updateZoomDisplay();
             renderMarkers();
         });
-
         document.getElementById('btnZoomOut').addEventListener('click', () => {
             state.scale = clamp(state.scale / 1.2, 0.1, 20);
             const rect = container.getBoundingClientRect();
-            const cx = rect.width / 2;
-            const cy = rect.height / 2;
+            const cx = rect.width / 2,
+                cy = rect.height / 2;
             const mapPos = viewToMap(cx, cy);
             state.translateX = cx - mapPos.x * state.scale;
             state.translateY = cy - mapPos.y * state.scale;
@@ -1881,17 +1797,14 @@
             updateZoomDisplay();
             renderMarkers();
         });
-
         document.getElementById('btnResetView').addEventListener('click', resetView);
         document.getElementById('btnToggleLabels').addEventListener('click', toggleLabels);
         document.getElementById('btnToggleLabels').style.opacity = '1';
-
         document.getElementById('btnClearAll').addEventListener('click', clearAllMarkers);
         document.getElementById('btnDeleteMap').addEventListener('click', deleteCurrentMap);
 
         // ---- 刷新资源 ----
         document.getElementById('btnReload').addEventListener('click', () => {
-            // 清空现有数据，重新加载
             state.maps = [];
             state.markers = [];
             state.mapLoaded = false;
@@ -1900,16 +1813,38 @@
             emptyHint.classList.add('show');
             renderMarkers();
             updateMapSelector();
-
-            // 重新构建图标列表
-            buildIconList();
-
-            // 重新加载
-            setTimeout(() => {
-                initFromRepo();
-            }, 300);
+            setTimeout(() => { initFromRepo(); }, 300);
             showToast('🔄 正在刷新资源...', 1500);
         });
+
+        // ============================================================
+        //  ⭐ 新增：绑定导入/导出按钮事件
+        // ============================================================
+
+        // 导出按钮
+        document.getElementById('btnExportData').addEventListener('click', exportMarkers);
+
+        // 导入按钮（文件选择）
+        document.getElementById('dataFileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if (importMarkers(data)) {
+                        showToast('✅ 导入成功！', 1500);
+                    }
+                } catch (err) {
+                    showToast('❌ 解析 JSON 失败: ' + err.message, 2000);
+                }
+            };
+            reader.readAsText(file);
+            e.target.value = ''; // 重置，允许重复选择同一文件
+        });
+
+        // 从仓库加载按钮
+        document.getElementById('btnLoadFromRepo').addEventListener('click', loadFromRepo);
 
         // ---- 地图选择器 ----
         mapSelector.addEventListener('change', (e) => {
@@ -1917,9 +1852,7 @@
             if (mapId) {
                 switchMap(mapId);
             } else {
-                if (state.currentMapId) {
-                    saveMarkers();
-                }
+                if (state.currentMapId) saveMarkers();
                 state.mapLoaded = false;
                 state.markers = [];
                 state.currentMapId = null;
@@ -1937,10 +1870,7 @@
                 const name = file.name.replace(/\.[^.]+$/, '');
                 const existing = state.maps.find(m => m.name === name);
                 if (existing) {
-                    if (!confirm(`已存在地图 "${name}"，是否覆盖？`)) {
-                        e.target.value = '';
-                        return;
-                    }
+                    if (!confirm(`已存在地图 "${name}"，是否覆盖？`)) { e.target.value = ''; return; }
                     localStorage.removeItem(storageKey(existing.id));
                     localStorage.removeItem(labelCustomizedKey(existing.id));
                     state.maps = state.maps.filter(m => m.id !== existing.id);
@@ -1998,12 +1928,10 @@
                 if (state.mapLoaded) {
                     const rect = container.getBoundingClientRect();
                     const margin = 200;
-                    const minX = -state.mapWidth * state.scale + margin;
-                    const maxX = rect.width - margin;
-                    const minY = -state.mapHeight * state.scale + margin;
-                    const maxY = rect.height - margin;
-                    state.translateX = clamp(state.translateX, minX, maxX);
-                    state.translateY = clamp(state.translateY, minY, maxY);
+                    state.translateX = clamp(state.translateX, -state.mapWidth * state.scale + margin, rect.width -
+                    margin);
+                    state.translateY = clamp(state.translateY, -state.mapHeight * state.scale + margin, rect.height -
+                        margin);
                     updateTransform();
                     renderMarkers();
                 }
@@ -2015,20 +1943,18 @@
         // ============================================================
 
         state.showLabels = true;
-        console.log('🗺️ 二游地图标记工具 · 自动加载仓库资源版');
-        console.log('📋 配置的地图:', MAP_CONFIG.maps);
-        console.log('📋 配置的图标:', MAP_CONFIG.icons);
+        console.log('🗺️ 白银之城标记工具');
+        console.log('📋 功能: 自动加载地图 + 导入/导出标记数据');
         console.log('📌 右键点击地图 → 添加标记');
-        console.log('🖱️ 拖拽标记 → 移动位置');
-        console.log('🖱️ 单击标记 → 编辑');
+        console.log('📤 导出数据 → 保存为 map_editor_state.json');
+        console.log('📥 导入数据 → 读取 JSON 文件恢复标记');
+        console.log('📂 从仓库加载 → 读取同目录的 map_editor_state.json');
 
-        // 尝试加载之前保存的地图数据
         loadAllMapsData().then(savedMaps => {
             if (savedMaps && savedMaps.length > 0) {
                 console.log('📂 找到已保存的地图数据:', savedMaps.length, '张');
                 state.maps = savedMaps;
                 updateMapSelector();
-
                 const firstMap = state.maps[0];
                 if (firstMap) {
                     loadMapFromData(firstMap.dataURL, firstMap.id, firstMap.name, firstMap.width, firstMap.height);
@@ -2036,7 +1962,6 @@
                 loading.classList.add('hidden');
             } else {
                 console.log('📂 没有已保存的地图，从仓库加载...');
-                // 没有保存的数据，从仓库加载
                 initFromRepo();
             }
         });
