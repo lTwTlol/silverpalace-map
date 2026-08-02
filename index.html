@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🗺️ 二游地图标记 · 在线协作版</title>
+    <title>二游地图资源标记工具</title>
     <style>
         /* ===== 全局重置 & 基础样式 ===== */
         * {
@@ -89,14 +89,6 @@
         .toolbar .btn-success:hover {
             transform: scale(1.03);
             box-shadow: 0 4px 20px rgba(52, 211, 153, 0.4);
-        }
-        .toolbar .btn-warning {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            color: #fff;
-        }
-        .toolbar .btn-warning:hover {
-            transform: scale(1.03);
-            box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
         }
         .toolbar .zoom-info {
             font-size: 13px;
@@ -684,12 +676,52 @@
         .hidden {
             display: none !important;
         }
+
+        /* ===== 加载状态 ===== */
+        #loading {
+            position: fixed;
+            top: 56px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 18px;
+            z-index: 50;
+            background: #0f0f1a;
+            gap: 16px;
+        }
+        #loading .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        #loading.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
+    <!-- 加载状态 -->
+    <div id="loading">
+        <div class="spinner"></div>
+        <span>🔄 正在加载地图资源...</span>
+    </div>
+
     <!-- 工具栏 -->
     <header class="toolbar">
-        <span class="brand">🗺️ 标记工具 · 在线版</span>
+        <span class="brand">🗺️ 标记工具</span>
         <span class="sep"></span>
 
         <!-- 地图选择器 -->
@@ -703,7 +735,7 @@
         <span class="sep"></span>
 
         <div class="file-input-wrap">
-            <button class="btn btn-success">📥 导入地图</button>
+            <button class="btn btn-success">📥 导入新地图</button>
             <input type="file" id="mapFileInput" accept="image/*" />
         </div>
 
@@ -716,18 +748,10 @@
 
         <span class="spacer"></span>
 
-        <!-- ===== 在线协作功能按钮 ===== -->
-        <button class="btn btn-warning" id="btnExportData">📤 导出数据</button>
-        <div class="file-input-wrap">
-            <button class="btn btn-primary">📥 导入数据</button>
-            <input type="file" id="dataFileInput" accept=".json" />
-        </div>
-
-        <span class="sep"></span>
-
         <button class="btn" id="btnToggleLabels">🏷️ 标签</button>
         <button class="btn" id="btnDeleteMap" style="color:#f87171;">🗑️ 删除地图</button>
         <button class="btn" id="btnClearAll" style="color:#f87171;">🧹 清空标记</button>
+        <button class="btn btn-primary" id="btnReload">🔄 刷新资源</button>
     </header>
 
     <!-- 地图容器 -->
@@ -739,7 +763,7 @@
         <div class="empty-hint show" id="emptyHint">
             <span class="big">🖼️</span>
             请导入游戏全景地图<br />
-            <span class="sub">点击「导入地图」或拖拽图片到窗口</span>
+            <span class="sub">点击「导入新地图」或拖拽图片到窗口</span>
         </div>
     </div>
 
@@ -790,19 +814,61 @@
 
     <script>
         // ============================================================
-        //  完整 JavaScript (多地图管理 + 图标切换自动更新标签 + 数据导入导出)
+        //  🗺️ 二游地图标记工具 - 自动加载仓库资源版
+        //  使用说明：在下方 MAP_CONFIG 中配置你的地图和图标
         // ============================================================
 
-        // ---- 图标列表 ----
-        const ICON_LIST = [
+        // ============================================================
+        //  📋 在这里配置你的地图和图标！（重要！！！）
+        // ============================================================
+        const MAP_CONFIG = {
+            // ---- 地图列表 ----
+            maps: [
+                // 每张地图：{ name: "显示名称", file: "文件名.png" }
+                { name: '主城地图', file: '主城地图.png' },
+                { name: '野外地图', file: '野外地图.png' },
+                // 添加更多地图...
+            ],
+
+            // ---- 图标列表（自动从仓库加载图片） ----
+            icons: [
+                { id: '信箱', label: '信箱', file: '信箱.png' },
+                { id: '包裹', label: '包裹', file: '包裹.png' },
+                { id: '保险柜', label: '保险柜', file: '保险柜.png' },
+                { id: '宝箱', label: '宝箱', file: '宝箱.png' },
+                { id: '清剿', label: '清剿', file: '清剿.png' },
+                { id: '问号', label: '问号', file: '问号.png' },
+            ]
+        };
+
+        // ---- 默认图标（如果图片加载失败，用 emoji 代替） ----
+        const FALLBACK_ICONS = [
             { id: 'emoji', label: '❓', emoji: '❓' },
-            { id: '信箱', label: '信箱', file: 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/1f4eb.png' },
-            { id: '包裹', label: '包裹', file: 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/1f4e6.png' },
-            { id: '保险柜', label: '保险柜', file: 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/1f5dd.png' },
-            { id: '宝箱', label: '宝箱', file: 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/1f5e1.png' },
-            { id: '清剿', label: '清剿', file: 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/1f4a5.png' },
-            { id: '问号', label: '问号', file: 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/2753.png' }
+            { id: 'emoji_star', label: '⭐', emoji: '⭐' },
+            { id: 'emoji_flag', label: '🚩', emoji: '🚩' },
         ];
+
+        // ============================================================
+        //  以下代码自动运行，无需修改
+        // ============================================================
+
+        // ---- 构建完整图标列表 ----
+        let ICON_LIST = [];
+
+        function buildIconList() {
+            ICON_LIST = [];
+            // 先从配置加载
+            for (const icon of MAP_CONFIG.icons) {
+                ICON_LIST.push({ ...icon });
+            }
+            // 添加 fallback emoji
+            for (const fallback of FALLBACK_ICONS) {
+                if (!ICON_LIST.find(i => i.id === fallback.id)) {
+                    ICON_LIST.push({ ...fallback });
+                }
+            }
+        }
+        buildIconList();
 
         // ---- 状态 ----
         let state = {
@@ -817,7 +883,7 @@
             nextId: 1,
             showLabels: true,
             currentMapId: null,
-            maps: [], // { id, name, dataURL, width, height }
+            maps: [],
             labelCustomized: {},
         };
 
@@ -829,6 +895,7 @@
         const mapImage = document.getElementById('mapImage');
         const markerContainer = document.getElementById('marker-container');
         const emptyHint = document.getElementById('emptyHint');
+        const loading = document.getElementById('loading');
 
         const zoomDisplay = document.getElementById('zoomDisplay');
         const contextMenu = document.getElementById('context-menu');
@@ -845,7 +912,10 @@
         const mapCount = document.getElementById('mapCount');
 
         let toastTimer = null;
+        let imageLoadCount = 0;
+        let totalImagesToLoad = 0;
 
+        // ---- Toast ----
         function showToast(msg, duration = 2000) {
             toast.textContent = msg;
             toast.classList.add('show');
@@ -1165,22 +1235,114 @@
 
                 mapSelector.value = mapId;
                 showToast('✅ 已加载: ' + (mapName || '未命名地图'));
+                loading.classList.add('hidden');
+            };
+            img.onerror = () => {
+                showToast('❌ 加载地图失败: ' + mapName, 2000);
+                loading.classList.add('hidden');
             };
             img.src = dataURL;
         }
 
-        function addNewMap(file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
+        // ---- 从仓库加载地图 ----
+        function loadMapFromRepo(mapConfig) {
+            // 使用相对路径加载图片
+            const img = new Image();
+            const filePath = mapConfig.file;
+
+            img.onload = () => {
+                const mapId = generateMapId();
+                const mapName = mapConfig.name || filePath.replace(/\.[^.]+$/, '');
+
+                // 转换为 dataURL 保存
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const dataURL = canvas.toDataURL('image/png');
+
+                state.maps.push({
+                    id: mapId,
+                    name: mapName,
+                    dataURL: dataURL,
+                    width: img.width,
+                    height: img.height,
+                });
+
+                // 如果是第一张地图，自动加载
+                if (state.maps.length === 1) {
+                    loadMapFromData(dataURL, mapId, mapName, img.width, img.height);
+                }
+
+                imageLoadCount++;
+                checkAllImagesLoaded();
+            };
+
+            img.onerror = () => {
+                console.warn('⚠️ 加载地图失败:', filePath);
+                imageLoadCount++;
+                checkAllImagesLoaded();
+            };
+
+            img.src = filePath;
+        }
+
+        // ---- 检查所有图片是否加载完成 ----
+        function checkAllImagesLoaded() {
+            if (imageLoadCount >= totalImagesToLoad) {
+                // 所有图片加载完成
+                if (state.maps.length === 0) {
+                    loading.classList.add('hidden');
+                    emptyHint.classList.add('show');
+                    showToast('⚠️ 没有找到地图图片，请检查 MAP_CONFIG', 3000);
+                } else {
+                    updateMapSelector();
+                    saveAllMapsData(state.maps);
+
+                    // 如果没有加载任何地图，加载第一张
+                    if (!state.mapLoaded && state.maps.length > 0) {
+                        const first = state.maps[0];
+                        loadMapFromData(first.dataURL, first.id, first.name, first.width, first.height);
+                    }
+                }
+            }
+        }
+
+        // ---- 初始化：从仓库加载所有资源 ----
+        function initFromRepo() {
+            // 显示加载状态
+            loading.classList.remove('hidden');
+            imageLoadCount = 0;
+
+            // 计算总图片数
+            totalImagesToLoad = MAP_CONFIG.maps.length + MAP_CONFIG.icons.length;
+
+            // 1. 加载地图
+            for (const map of MAP_CONFIG.maps) {
+                loadMapFromRepo(map);
+            }
+
+            // 2. 加载图标（预加载，确保缓存）
+            for (const icon of MAP_CONFIG.icons) {
                 const img = new Image();
                 img.onload = () => {
-                    const mapId = generateMapId();
-                    const mapName = file.name.replace(/\.[^.]+$/, '');
-                    loadMapFromData(e.target.result, mapId, mapName, img.width, img.height);
+                    imageLoadCount++;
+                    checkAllImagesLoaded();
                 };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+                img.onerror = () => {
+                    imageLoadCount++;
+                    checkAllImagesLoaded();
+                };
+                img.src = icon.file;
+            }
+
+            // 如果没有任何资源，直接隐藏 loading
+            if (totalImagesToLoad === 0) {
+                loading.classList.add('hidden');
+                emptyHint.classList.add('show');
+                updateMapSelector();
+            }
         }
 
         // ---- 切换地图 ----
@@ -1436,8 +1598,8 @@
                 id: genId(),
                 x: clamp(mapX, 0, state.mapWidth),
                 y: clamp(mapY, 0, state.mapHeight),
-                icon: '❓',
-                label: '❓',
+                icon: ICON_LIST.length > 0 ? (ICON_LIST[0].id || '❓') : '❓',
+                label: ICON_LIST.length > 0 ? ICON_LIST[0].label : '❓',
                 note: '[]',
                 size: 32,
             };
@@ -1525,7 +1687,7 @@
                 } else {
                     const span = document.createElement('span');
                     span.className = 'emoji';
-                    span.textContent = info.emoji;
+                    span.textContent = info.emoji || '❓';
                     div.appendChild(span);
                 }
                 div.dataset.iconId = info.id;
@@ -1613,129 +1775,6 @@
             saveMarkers();
             closeEditPanel();
             showToast('🧹 已清空所有标记', 1500);
-        }
-
-        // ============================================================
-        //  🚀 在线协作核心：数据导出 / 导入（让其他人也能编辑）
-        // ============================================================
-
-        // ---- 导出全部数据（地图 + 标记） ----
-        function exportAllData() {
-            if (state.maps.length === 0) {
-                showToast('⚠️ 没有数据可导出', 1500);
-                return;
-            }
-
-            // 收集所有地图的标记数据
-            const allMarkersData = {};
-            for (const map of state.maps) {
-                const key = storageKey(map.id);
-                const raw = localStorage.getItem(key);
-                if (raw) {
-                    allMarkersData[map.id] = JSON.parse(raw);
-                }
-                const customKey = labelCustomizedKey(map.id);
-                const customRaw = localStorage.getItem(customKey);
-                if (customRaw) {
-                    allMarkersData[map.id + '_custom'] = JSON.parse(customRaw);
-                }
-            }
-
-            const exportData = {
-                version: '1.0',
-                exportedAt: new Date().toISOString(),
-                maps: state.maps,
-                markersData: allMarkersData,
-            };
-
-            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `地图标记数据_${new Date().toISOString().slice(0,10)}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showToast('📤 数据已导出！分享给其他人导入即可协作', 2500);
-        }
-
-        // ---- 导入数据（合并或覆盖） ----
-        function importData(file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    if (!data.maps || !data.markersData) {
-                        showToast('❌ 无效的数据文件', 1500);
-                        return;
-                    }
-
-                    // 检查是否已有地图，提示用户
-                    const hasExisting = state.maps.length > 0;
-                    let mode = 'merge';
-                    if (hasExisting) {
-                        if (!confirm(
-                                `当前已有 ${state.maps.length} 张地图。\n\n「确定」= 合并数据（保留全部）\n「取消」= 覆盖所有数据（清空现有）`
-                                )) {
-                            mode = 'overwrite';
-                        }
-                    }
-
-                    if (mode === 'overwrite') {
-                        // 清空所有现有数据
-                        for (const map of state.maps) {
-                            localStorage.removeItem(storageKey(map.id));
-                            localStorage.removeItem(labelCustomizedKey(map.id));
-                        }
-                        state.maps = [];
-                        state.markers = [];
-                        state.currentMapId = null;
-                        state.mapLoaded = false;
-                        mapImage.src = '';
-                        emptyHint.classList.add('show');
-                        renderMarkers();
-                    }
-
-                    // 导入地图
-                    let importedCount = 0;
-                    for (const mapData of data.maps) {
-                        const existing = state.maps.find(m => m.id === mapData.id);
-                        if (!existing) {
-                            state.maps.push(mapData);
-                            importedCount++;
-                        } else {
-                            // 更新现有地图信息
-                            existing.name = mapData.name;
-                            existing.dataURL = mapData.dataURL;
-                            existing.width = mapData.width;
-                            existing.height = mapData.height;
-                        }
-
-                        // 导入标记数据
-                        const markerKey = storageKey(mapData.id);
-                        const customKey = labelCustomizedKey(mapData.id);
-                        if (data.markersData[mapData.id]) {
-                            localStorage.setItem(markerKey, JSON.stringify(data.markersData[mapData.id]));
-                        }
-                        if (data.markersData[mapData.id + '_custom']) {
-                            localStorage.setItem(customKey, JSON.stringify(data.markersData[mapData.id + '_custom']));
-                        }
-                    }
-
-                    saveAllMapsData(state.maps);
-                    updateMapSelector();
-
-                    // 自动加载第一个地图
-                    if (state.maps.length > 0) {
-                        switchMap(state.maps[0].id);
-                    }
-
-                    showToast(`✅ 导入成功！新增 ${importedCount} 张地图，共 ${state.maps.length} 张`, 2500);
-                } catch (err) {
-                    showToast('❌ 数据解析失败: ' + err.message, 2000);
-                    console.error(err);
-                }
-            };
-            reader.readAsText(file);
         }
 
         // ---- 右键菜单 ----
@@ -1844,16 +1883,26 @@
         document.getElementById('btnClearAll').addEventListener('click', clearAllMarkers);
         document.getElementById('btnDeleteMap').addEventListener('click', deleteCurrentMap);
 
-        // ---- 在线协作按钮 ----
-        document.getElementById('btnExportData').addEventListener('click', exportAllData);
-        document.getElementById('dataFileInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file && file.name.endsWith('.json')) {
-                importData(file);
-            } else {
-                showToast('⚠️ 请选择 .json 数据文件', 1500);
-            }
-            e.target.value = '';
+        // ---- 刷新资源 ----
+        document.getElementById('btnReload').addEventListener('click', () => {
+            // 清空现有数据，重新加载
+            state.maps = [];
+            state.markers = [];
+            state.mapLoaded = false;
+            state.currentMapId = null;
+            mapImage.src = '';
+            emptyHint.classList.add('show');
+            renderMarkers();
+            updateMapSelector();
+
+            // 重新构建图标列表
+            buildIconList();
+
+            // 重新加载
+            setTimeout(() => {
+                initFromRepo();
+            }, 300);
+            showToast('🔄 正在刷新资源...', 1500);
         });
 
         // ---- 地图选择器 ----
@@ -1895,7 +1944,20 @@
             e.target.value = '';
         });
 
-        // ---- 拖拽导入 ----
+        function addNewMap(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const mapId = generateMapId();
+                    const mapName = file.name.replace(/\.[^.]+$/, '');
+                    loadMapFromData(e.target.result, mapId, mapName, img.width, img.height);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
         container.addEventListener('dragover', (e) => {
             e.preventDefault();
             container.style.border = '2px dashed rgba(102,126,234,0.5)';
@@ -1942,26 +2004,32 @@
             }, 200);
         });
 
-        // ---- 初始化 ----
-        state.showLabels = true;
-        console.log('🗺️ 二游地图标记工具 · 在线协作版');
-        console.log('📌 右键点击地图 → 添加标记');
-        console.log('📤 导出数据 → 分享给其他人');
-        console.log('📥 导入数据 → 合并/覆盖其他人分享的数据');
+        // ============================================================
+        //  🚀 启动！
+        // ============================================================
 
-        // 加载地图列表
-        loadAllMapsData().then(maps => {
-            if (maps && maps.length > 0) {
-                state.maps = maps;
+        state.showLabels = true;
+        console.log('🗺️ 二游地图标记工具 · 自动加载仓库资源版');
+        console.log('📋 请在 MAP_CONFIG 中配置你的地图和图标');
+        console.log('📌 右键点击地图 → 添加标记');
+        console.log('🖱️ 拖拽标记 → 移动位置');
+        console.log('🖱️ 单击标记 → 编辑');
+
+        // 尝试加载之前保存的地图数据
+        loadAllMapsData().then(savedMaps => {
+            if (savedMaps && savedMaps.length > 0) {
+                // 有保存的数据，使用保存的数据
+                state.maps = savedMaps;
                 updateMapSelector();
 
                 const firstMap = state.maps[0];
                 if (firstMap) {
                     loadMapFromData(firstMap.dataURL, firstMap.id, firstMap.name, firstMap.width, firstMap.height);
                 }
+                loading.classList.add('hidden');
             } else {
-                emptyHint.classList.add('show');
-                updateMapSelector();
+                // 没有保存的数据，从仓库加载
+                initFromRepo();
             }
         });
     </script>
