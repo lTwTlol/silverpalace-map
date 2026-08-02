@@ -1,0 +1,1830 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>二游地图资源标记工具</title>
+    <style>
+        /* ===== 全局重置 & 基础样式 ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            background: #1a1a2e;
+            font-family: 'Segoe UI', 'PingFang SC', Roboto, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* ===== 顶部工具栏 ===== */
+        .toolbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            height: 56px;
+            background: rgba(26, 26, 46, 0.88);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            gap: 12px;
+            color: #eee;
+            flex-shrink: 0;
+            overflow-x: auto;
+        }
+        .toolbar .brand {
+            font-weight: 700;
+            font-size: 18px;
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 0.5px;
+            margin-right: 8px;
+            white-space: nowrap;
+        }
+        .toolbar .sep {
+            width: 1px;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.12);
+            flex-shrink: 0;
+        }
+        .toolbar .btn {
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(255, 255, 255, 0.07);
+            color: #ddd;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .toolbar .btn:hover {
+            background: rgba(255, 255, 255, 0.16);
+            color: #fff;
+        }
+        .toolbar .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+        }
+        .toolbar .btn-primary:hover {
+            transform: scale(1.03);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+        .toolbar .btn-success {
+            background: linear-gradient(135deg, #34d399, #059669);
+            color: #fff;
+        }
+        .toolbar .btn-success:hover {
+            transform: scale(1.03);
+            box-shadow: 0 4px 20px rgba(52, 211, 153, 0.4);
+        }
+        .toolbar .zoom-info {
+            font-size: 13px;
+            color: #aaa;
+            min-width: 60px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
+        }
+        .toolbar .spacer {
+            flex: 1;
+            min-width: 10px;
+        }
+        .toolbar .file-input-wrap {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+        .toolbar .file-input-wrap input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        /* ===== 地图选择器 ===== */
+        .map-selector-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .map-selector-wrap select {
+            padding: 5px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(0, 0, 0, 0.4);
+            color: #eee;
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
+            max-width: 160px;
+            font-family: inherit;
+        }
+        .map-selector-wrap select:hover {
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        .map-selector-wrap select option {
+            background: #1a1a2e;
+            color: #eee;
+        }
+        .map-selector-wrap .map-count {
+            font-size: 12px;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        /* ===== 地图容器 ===== */
+        #map-container {
+            position: fixed;
+            top: 56px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #0f0f1a;
+            overflow: hidden;
+            cursor: grab;
+        }
+        #map-container.grabbing {
+            cursor: grabbing;
+        }
+
+        /* ===== 地图图层 (仅负责图片变换) ===== */
+        #map-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: 0 0;
+            will-change: transform;
+            pointer-events: none;
+        }
+        #map-layer img {
+            display: block;
+            width: auto;
+            height: auto;
+            pointer-events: none;
+            image-rendering: auto;
+        }
+
+        /* ===== 标记容器 (独立于地图图层) ===== */
+        #marker-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .marker {
+            position: absolute;
+            pointer-events: auto;
+            cursor: grab;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: filter 0.15s;
+            z-index: 10;
+            will-change: transform;
+            transform: translate(-50%, -50%);
+        }
+        .marker:active {
+            cursor: grabbing;
+        }
+        .marker:hover {
+            filter: brightness(1.2) drop-shadow(0 0 12px rgba(255, 255, 255, 0.25));
+            z-index: 20;
+        }
+        .marker .icon-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(2px);
+            border: 1.5px solid rgba(255, 255, 255, 0.15);
+            transition: all 0.2s;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        .marker .icon-wrap img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 50%;
+        }
+        .marker .icon-wrap .emoji {
+            font-size: inherit;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.2);
+        }
+        .marker .label-text {
+            margin-top: 4px;
+            font-size: 11px;
+            color: #fff;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.45);
+            padding: 1px 8px;
+            border-radius: 10px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+            pointer-events: none;
+        }
+        .marker .label-text.hidden {
+            display: none;
+        }
+
+        /* ===== 右键菜单 ===== */
+        #context-menu {
+            position: fixed;
+            z-index: 999;
+            background: rgba(30, 30, 50, 0.96);
+            backdrop-filter: blur(16px);
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            padding: 6px 0;
+            min-width: 170px;
+            display: none;
+            overflow: hidden;
+            animation: menuFade 0.15s ease;
+        }
+        @keyframes menuFade {
+            from {
+                opacity: 0;
+                transform: scale(0.96) translateY(-6px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        #context-menu .menu-item {
+            padding: 10px 22px;
+            color: #e8e8f0;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.12s;
+            border: none;
+            background: transparent;
+            width: 100%;
+            text-align: left;
+            font-weight: 450;
+        }
+        #context-menu .menu-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+        #context-menu .menu-item .icon {
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+        }
+        #context-menu .menu-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.06);
+            margin: 4px 12px;
+        }
+
+        /* ===== 编辑面板 ===== */
+        #edit-panel {
+            position: fixed;
+            z-index: 500;
+            background: rgba(24, 24, 42, 0.96);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8);
+            padding: 28px 30px 30px;
+            min-width: 340px;
+            max-width: 420px;
+            display: none;
+            animation: panelSlide 0.2s ease;
+            color: #eee;
+        }
+        @keyframes panelSlide {
+            from {
+                opacity: 0;
+                transform: translateY(12px) scale(0.97);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        #edit-panel .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        #edit-panel .panel-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        #edit-panel .panel-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 22px;
+            cursor: pointer;
+            padding: 0 4px;
+            transition: color 0.2s;
+            line-height: 1;
+        }
+        #edit-panel .panel-close:hover {
+            color: #fff;
+        }
+        #edit-panel .field {
+            margin-bottom: 16px;
+        }
+        #edit-panel .field label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: #aaa;
+            margin-bottom: 5px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        #edit-panel .field .icon-grid {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 4px 0;
+        }
+        #edit-panel .field .icon-option {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            border: 2px solid transparent;
+            background: rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            font-size: 24px;
+            padding: 4px;
+        }
+        #edit-panel .field .icon-option:hover {
+            background: rgba(255, 255, 255, 0.12);
+            transform: scale(1.05);
+        }
+        #edit-panel .field .icon-option.active {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.2);
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.2);
+        }
+        #edit-panel .field .icon-option img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 6px;
+        }
+        #edit-panel .field .icon-option .emoji {
+            font-size: 26px;
+            line-height: 1;
+        }
+        #edit-panel .field input[type="text"] {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(0, 0, 0, 0.3);
+            color: #eee;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            outline: none;
+            font-family: inherit;
+        }
+        #edit-panel .field input[type="text"]:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+        }
+
+        /* ===== 备注富文本编辑器 ===== */
+        #editNote {
+            width: 100%;
+            min-height: 120px;
+            max-height: 300px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(0, 0, 0, 0.3);
+            color: #eee;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            outline: none;
+            font-family: inherit;
+            resize: vertical;
+            overflow-y: auto;
+            line-height: 1.6;
+            cursor: text;
+        }
+        #editNote:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+        }
+        #editNote:empty::before {
+            content: "输入备注信息… (支持粘贴图片)";
+            color: #666;
+        }
+        #editNote img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            margin: 4px 0;
+            display: block;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        #editNote .note-img-wrap {
+            display: block;
+            margin: 6px 0;
+            position: relative;
+        }
+        #editNote .note-img-wrap img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        #editNote .note-img-wrap .img-delete {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 14px;
+            cursor: pointer;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        #editNote .note-img-wrap:hover .img-delete {
+            opacity: 1;
+        }
+        #editNote .note-img-wrap .img-delete:hover {
+            background: rgba(248, 113, 113, 0.8);
+        }
+
+        #edit-panel .field .size-control {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        #edit-panel .field .size-control input[type="range"] {
+            flex: 1;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            height: 4px;
+            border-radius: 4px;
+            outline: none;
+        }
+        #edit-panel .field .size-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+        #edit-panel .field .size-control .size-value {
+            min-width: 40px;
+            text-align: center;
+            font-weight: 600;
+            color: #ccc;
+            font-size: 15px;
+        }
+        #edit-panel .panel-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 8px;
+        }
+        #edit-panel .panel-actions button {
+            padding: 10px 24px;
+            border-radius: 12px;
+            border: none;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        #edit-panel .panel-actions .btn-delete {
+            background: rgba(248, 113, 113, 0.15);
+            color: #f87171;
+        }
+        #edit-panel .panel-actions .btn-delete:hover {
+            background: rgba(248, 113, 113, 0.25);
+        }
+
+        /* ===== 空状态提示 ===== */
+        .empty-hint {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255, 255, 255, 0.15);
+            font-size: 20px;
+            text-align: center;
+            pointer-events: none;
+            line-height: 1.8;
+            z-index: 0;
+            display: none;
+        }
+        .empty-hint.show {
+            display: block;
+        }
+        .empty-hint .big {
+            font-size: 52px;
+            display: block;
+            margin-bottom: 8px;
+            opacity: 0.6;
+        }
+        .empty-hint .sub {
+            font-size: 14px;
+            opacity: 0.4;
+        }
+
+        /* ===== 提示信息 ===== */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(30, 30, 50, 0.9);
+            backdrop-filter: blur(12px);
+            color: #eee;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 2000;
+            pointer-events: none;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 640px) {
+            .toolbar {
+                padding: 0 12px;
+                gap: 6px;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+            }
+            .toolbar .brand {
+                font-size: 14px;
+                margin-right: 4px;
+            }
+            .toolbar .btn {
+                font-size: 11px;
+                padding: 4px 8px;
+            }
+            .map-selector-wrap select {
+                max-width: 100px;
+                font-size: 12px;
+                padding: 3px 8px;
+            }
+            .map-selector-wrap .map-count {
+                font-size: 10px;
+            }
+            #edit-panel {
+                left: 12px !important;
+                right: 12px !important;
+                top: 50% !important;
+                transform: translateY(-50%) !important;
+                min-width: unset;
+                padding: 20px;
+                max-width: unset;
+                width: calc(100% - 24px);
+                border-radius: 16px;
+            }
+            #edit-panel .field .icon-grid {
+                gap: 6px;
+            }
+            #edit-panel .field .icon-option {
+                width: 36px;
+                height: 36px;
+            }
+            #context-menu {
+                min-width: 140px;
+            }
+            #context-menu .menu-item {
+                padding: 8px 16px;
+                font-size: 13px;
+            }
+            .marker .label-text {
+                font-size: 9px;
+                padding: 0 6px;
+                max-width: 80px;
+            }
+            #editNote {
+                min-height: 80px;
+                max-height: 200px;
+            }
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- 工具栏 -->
+    <header class="toolbar">
+        <span class="brand">🗺️ 标记工具</span>
+        <span class="sep"></span>
+
+        <!-- 地图选择器 -->
+        <div class="map-selector-wrap">
+            <select id="mapSelector">
+                <option value="">-- 选择地图 --</option>
+            </select>
+            <span class="map-count" id="mapCount">0 张</span>
+        </div>
+
+        <span class="sep"></span>
+
+        <div class="file-input-wrap">
+            <button class="btn btn-success">📥 导入新地图</button>
+            <input type="file" id="mapFileInput" accept="image/*" />
+        </div>
+
+        <span class="sep"></span>
+
+        <button class="btn" id="btnZoomIn">🔍+</button>
+        <span class="zoom-info" id="zoomDisplay">100%</span>
+        <button class="btn" id="btnZoomOut">🔍−</button>
+        <button class="btn" id="btnResetView">⟲ 复位</button>
+
+        <span class="spacer"></span>
+
+        <button class="btn" id="btnToggleLabels">🏷️ 标签</button>
+        <button class="btn" id="btnDeleteMap" style="color:#f87171;">🗑️ 删除地图</button>
+        <button class="btn" id="btnClearAll" style="color:#f87171;">🧹 清空标记</button>
+    </header>
+
+    <!-- 地图容器 -->
+    <div id="map-container">
+        <div id="map-layer">
+            <img id="mapImage" src="" alt="游戏地图" draggable="false" />
+        </div>
+        <div id="marker-container"></div>
+        <div class="empty-hint show" id="emptyHint">
+            <span class="big">🖼️</span>
+            请导入游戏全景地图<br />
+            <span class="sub">点击「导入新地图」或拖拽图片到窗口</span>
+        </div>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div id="context-menu">
+        <button class="menu-item" id="ctxAddMarker">
+            <span class="icon">➕</span> 添加标记
+        </button>
+        <div class="menu-divider"></div>
+        <button class="menu-item" id="ctxCancel">
+            <span class="icon">✖️</span> 取消
+        </button>
+    </div>
+
+    <!-- 编辑面板 -->
+    <div id="edit-panel">
+        <div class="panel-header">
+            <h3>✏️ 编辑标记</h3>
+            <button class="panel-close" id="panelClose">✕</button>
+        </div>
+        <div class="field">
+            <label>🎨 图标</label>
+            <div class="icon-grid" id="iconGrid"></div>
+        </div>
+        <div class="field">
+            <label>🏷️ 标签</label>
+            <input type="text" id="editLabel" placeholder="输入标签名称" />
+            <div style="font-size:11px;color:#666;margin-top:4px;">💡 切换图标时标签会自动跟随（除非您手动修改过）</div>
+        </div>
+        <div class="field">
+            <label>📝 备注 <span style="color:#666;font-weight:400;text-transform:none;font-size:11px;">(支持粘贴图片 Ctrl+V)</span></label>
+            <div id="editNote" contenteditable="true"></div>
+        </div>
+        <div class="field">
+            <label>📏 图标大小</label>
+            <div class="size-control">
+                <input type="range" id="editSize" min="16" max="64" value="32" step="1" />
+                <span class="size-value" id="sizeValue">32</span>
+            </div>
+        </div>
+        <div class="panel-actions">
+            <button class="btn-delete" id="btnDeleteMarker">🗑️ 删除标记</button>
+        </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ============================================================
+        //  完整 JavaScript (多地图管理 + 图标切换自动更新标签)
+        // ============================================================
+
+        // ---- 图标列表 ----
+        const ICON_LIST = [
+            { id: 'emoji', label: '❓', emoji: '❓' },
+            { id: '信箱', label: '信箱', file: '信箱.png' },
+            { id: '包裹', label: '包裹', file: '包裹.png' },
+            { id: '保险柜', label: '保险柜', file: '保险柜.png' },
+            { id: '宝箱', label: '宝箱', file: '宝箱.png' },
+            { id: '清剿', label: '清剿', file: '清剿.png' },
+            { id: '问号', label: '问号', file: '问号.png' }
+        ];
+
+        // ---- 状态 ----
+        let state = {
+            mapLoaded: false,
+            mapWidth: 0,
+            mapHeight: 0,
+            scale: 1,
+            translateX: 0,
+            translateY: 0,
+            markers: [],
+            selectedId: null,
+            nextId: 1,
+            showLabels: true,
+            currentMapId: null,
+            maps: [], // { id, name, dataURL, width, height }
+            // 记录每个标记的标签是否为"用户自定义"
+            labelCustomized: {}, // key: markerId, value: boolean
+        };
+
+        // ---- 全局拖拽状态 ----
+        let isDraggingMarker = false;
+
+        // ---- DOM 引用 ----
+        const container = document.getElementById('map-container');
+        const mapLayer = document.getElementById('map-layer');
+        const mapImage = document.getElementById('mapImage');
+        const markerContainer = document.getElementById('marker-container');
+        const emptyHint = document.getElementById('emptyHint');
+
+        const zoomDisplay = document.getElementById('zoomDisplay');
+        const contextMenu = document.getElementById('context-menu');
+        const editPanel = document.getElementById('edit-panel');
+
+        const iconGrid = document.getElementById('iconGrid');
+        const editLabel = document.getElementById('editLabel');
+        const editNote = document.getElementById('editNote');
+        const editSize = document.getElementById('editSize');
+        const sizeValue = document.getElementById('sizeValue');
+        const toast = document.getElementById('toast');
+
+        const mapSelector = document.getElementById('mapSelector');
+        const mapCount = document.getElementById('mapCount');
+
+        let toastTimer = null;
+
+        // ---- Toast 提示 ----
+        function showToast(msg, duration = 2000) {
+            toast.textContent = msg;
+            toast.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
+
+        // ---- IndexedDB 工具 ----
+        const DB_NAME = 'MapMarkerDB';
+        const STORE_NAME = 'mapData';
+        const DB_VERSION = 2;
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    }
+                };
+                request.onsuccess = (e) => resolve(e.target.result);
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function saveAllMapsData(maps) {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                await new Promise((resolve, reject) => {
+                    const req = store.put({
+                        id: 'allMaps',
+                        maps: maps,
+                        timestamp: Date.now()
+                    });
+                    req.onsuccess = resolve;
+                    req.onerror = () => reject(req.error);
+                });
+                db.close();
+                return true;
+            } catch (e) {
+                console.warn('保存地图列表失败:', e);
+                return false;
+            }
+        }
+
+        async function loadAllMapsData() {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const data = await new Promise((resolve, reject) => {
+                    const req = store.get('allMaps');
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+                db.close();
+                return data ? data.maps : null;
+            } catch (e) {
+                console.warn('读取地图列表失败:', e);
+                return null;
+            }
+        }
+
+        // ---- 工具函数 ----
+        function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+        function genId() { return state.nextId++; }
+
+        function storageKey(mapId) {
+            return 'map_markers_' + mapId;
+        }
+
+        function labelCustomizedKey(mapId) {
+            return 'map_label_customized_' + mapId;
+        }
+
+        function generateMapId() {
+            return 'map_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        }
+
+        // ---- 坐标转换 ----
+        function mapToView(mapX, mapY) {
+            return {
+                x: mapX * state.scale + state.translateX,
+                y: mapY * state.scale + state.translateY,
+            };
+        }
+
+        function viewToMap(vx, vy) {
+            return {
+                x: (vx - state.translateX) / state.scale,
+                y: (vy - state.translateY) / state.scale,
+            };
+        }
+
+        // ---- 渲染标记 ----
+        function renderMarkers() {
+            markerContainer.innerHTML = '';
+            if (!state.mapLoaded) return;
+
+            const sorted = [...state.markers].sort((a, b) => a.id - b.id);
+
+            for (const m of sorted) {
+                const pos = mapToView(m.x, m.y);
+                const size = m.size || 32;
+
+                const el = document.createElement('div');
+                el.className = 'marker';
+                el.dataset.id = m.id;
+                el.style.left = pos.x + 'px';
+                el.style.top = pos.y + 'px';
+                el.style.width = size + 'px';
+                el.style.height = size + 'px';
+
+                const wrap = document.createElement('div');
+                wrap.className = 'icon-wrap';
+                wrap.style.width = size + 'px';
+                wrap.style.height = size + 'px';
+                wrap.style.fontSize = (size * 0.7) + 'px';
+
+                const iconInfo = ICON_LIST.find(i => i.id === m.icon || i.emoji === m.icon);
+                if (iconInfo && iconInfo.file) {
+                    const img = document.createElement('img');
+                    img.src = iconInfo.file;
+                    img.alt = iconInfo.label;
+                    img.draggable = false;
+                    img.onerror = function() {
+                        this.parentElement.innerHTML = `<span class="emoji">❓</span>`;
+                    };
+                    wrap.appendChild(img);
+                } else {
+                    const span = document.createElement('span');
+                    span.className = 'emoji';
+                    span.textContent = m.icon || '❓';
+                    wrap.appendChild(span);
+                }
+                el.appendChild(wrap);
+
+                if (state.showLabels && m.label) {
+                    const labelEl = document.createElement('div');
+                    labelEl.className = 'label-text';
+                    labelEl.textContent = m.label;
+                    el.appendChild(labelEl);
+                }
+
+                el.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0) return;
+                    e.stopPropagation();
+                    const rect = el.getBoundingClientRect();
+                    const size = m.size || 32;
+                    const offsetX = (e.clientX - rect.left) * (size / rect.width);
+                    const offsetY = (e.clientY - rect.top) * (size / rect.height);
+                    window._dragData = {
+                        id: m.id,
+                        offsetX: offsetX,
+                        offsetY: offsetY,
+                    };
+                    isDraggingMarker = false;
+                });
+
+                el.addEventListener('click', (e) => {
+                    if (isDraggingMarker) return;
+                    e.stopPropagation();
+                    openEditPanel(m.id);
+                });
+
+                markerContainer.appendChild(el);
+            }
+
+            if (state.mapLoaded) {
+                emptyHint.classList.remove('show');
+            }
+        }
+
+        // ---- 全局拖拽处理 ----
+        let mapDrag = null;
+
+        document.addEventListener('mousemove', (e) => {
+            if (window._dragData) {
+                const { id, offsetX, offsetY } = window._dragData;
+                const rect = container.getBoundingClientRect();
+                const vx = e.clientX - rect.left - offsetX;
+                const vy = e.clientY - rect.top - offsetY;
+                const mapPos = viewToMap(vx, vy);
+                const m = state.markers.find(m => m.id === id);
+                if (m) {
+                    m.x = clamp(mapPos.x, 0, state.mapWidth);
+                    m.y = clamp(mapPos.y, 0, state.mapHeight);
+                    isDraggingMarker = true;
+                    renderMarkers();
+                    saveMarkers();
+                }
+                e.preventDefault();
+                return;
+            }
+
+            if (mapDrag) {
+                const dx = e.clientX - mapDrag.startX;
+                const dy = e.clientY - mapDrag.startY;
+                state.translateX = mapDrag.tx + dx;
+                state.translateY = mapDrag.ty + dy;
+                updateTransform();
+                renderMarkers();
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (window._dragData) {
+                window._dragData = null;
+                setTimeout(() => { isDraggingMarker = false; }, 10);
+                container.classList.remove('grabbing');
+                return;
+            }
+            if (mapDrag) {
+                mapDrag = null;
+                container.classList.remove('grabbing');
+            }
+        });
+
+        container.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            if (e.target.closest('.marker')) return;
+            if (e.target.closest('#context-menu')) return;
+            if (e.target.closest('#edit-panel')) return;
+            mapDrag = {
+                startX: e.clientX,
+                startY: e.clientY,
+                tx: state.translateX,
+                ty: state.translateY,
+            };
+            container.classList.add('grabbing');
+        });
+
+        // ---- 滚轮缩放 ----
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.08 : 0.08;
+            const newScale = clamp(state.scale * (1 + delta), 0.1, 20);
+
+            const rect = container.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const mapPos = viewToMap(mx, my);
+
+            state.scale = newScale;
+            state.translateX = mx - mapPos.x * state.scale;
+            state.translateY = my - mapPos.y * state.scale;
+
+            updateTransform();
+            renderMarkers();
+            updateZoomDisplay();
+        }, { passive: false });
+
+        // ---- 更新地图图层变换 ----
+        function updateTransform() {
+            mapLayer.style.transform = `translate(${state.translateX}px, ${state.translateY}px) scale(${state.scale})`;
+        }
+
+        function updateZoomDisplay() {
+            zoomDisplay.textContent = Math.round(state.scale * 100) + '%';
+        }
+
+        // ---- 地图加载 ----
+        function loadMapFromData(dataURL, mapId, mapName, width, height) {
+            const img = new Image();
+            img.onload = () => {
+                state.mapWidth = img.width;
+                state.mapHeight = img.height;
+                state.mapLoaded = true;
+                state.currentMapId = mapId;
+
+                const existing = state.maps.find(m => m.id === mapId);
+                if (!existing) {
+                    state.maps.push({
+                        id: mapId,
+                        name: mapName || '未命名地图',
+                        dataURL: dataURL,
+                        width: img.width,
+                        height: img.height,
+                    });
+                } else {
+                    existing.dataURL = dataURL;
+                    existing.name = mapName || existing.name;
+                    existing.width = img.width;
+                    existing.height = img.height;
+                }
+                saveAllMapsData(state.maps);
+                updateMapSelector();
+
+                mapImage.src = dataURL;
+
+                const rect = container.getBoundingClientRect();
+                const pad = 40;
+                const availW = rect.width - pad;
+                const availH = rect.height - pad;
+                const scaleX = availW / img.width;
+                const scaleY = availH / img.height;
+                state.scale = clamp(Math.min(scaleX, scaleY), 0.1, 5);
+                state.translateX = (rect.width - img.width * state.scale) / 2;
+                state.translateY = (rect.height - img.height * state.scale) / 2;
+
+                updateTransform();
+                updateZoomDisplay();
+                emptyHint.classList.remove('show');
+
+                mapImage.style.width = img.width + 'px';
+                mapImage.style.height = img.height + 'px';
+
+                loadMarkers();
+                renderMarkers();
+
+                mapSelector.value = mapId;
+                showToast('✅ 已加载: ' + (mapName || '未命名地图'));
+            };
+            img.src = dataURL;
+        }
+
+        function addNewMap(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const mapId = generateMapId();
+                    const mapName = file.name.replace(/\.[^.]+$/, '');
+                    loadMapFromData(e.target.result, mapId, mapName, img.width, img.height);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ---- 切换地图 ----
+        function switchMap(mapId) {
+            if (!mapId) {
+                state.mapLoaded = false;
+                state.markers = [];
+                mapImage.src = '';
+                emptyHint.classList.add('show');
+                renderMarkers();
+                state.currentMapId = null;
+                return;
+            }
+
+            const mapData = state.maps.find(m => m.id === mapId);
+            if (!mapData) {
+                showToast('❌ 找不到地图数据', 1500);
+                return;
+            }
+
+            if (state.currentMapId && state.mapLoaded) {
+                saveMarkers();
+            }
+
+            loadMapFromData(mapData.dataURL, mapData.id, mapData.name, mapData.width, mapData.height);
+        }
+
+        // ---- 删除地图 ----
+        function deleteCurrentMap() {
+            if (!state.currentMapId) {
+                showToast('⚠️ 没有地图可删除', 1500);
+                return;
+            }
+
+            const mapData = state.maps.find(m => m.id === state.currentMapId);
+            if (!mapData) return;
+
+            if (!confirm(`确定要删除地图 "${mapData.name}" 及其所有标记吗？`)) return;
+
+            localStorage.removeItem(storageKey(state.currentMapId));
+            localStorage.removeItem(labelCustomizedKey(state.currentMapId));
+
+            state.maps = state.maps.filter(m => m.id !== state.currentMapId);
+            saveAllMapsData(state.maps);
+
+            state.mapLoaded = false;
+            state.markers = [];
+            state.currentMapId = null;
+            state.labelCustomized = {};
+            mapImage.src = '';
+            emptyHint.classList.add('show');
+            renderMarkers();
+
+            updateMapSelector();
+            showToast('🗑️ 已删除地图', 1500);
+        }
+
+        // ---- 更新地图选择器 ----
+        function updateMapSelector() {
+            const currentValue = mapSelector.value;
+            mapSelector.innerHTML = '<option value="">-- 选择地图 --</option>';
+            for (const m of state.maps) {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.name + ' (' + m.width + '×' + m.height + ')';
+                if (m.id === state.currentMapId) {
+                    opt.selected = true;
+                }
+                mapSelector.appendChild(opt);
+            }
+            mapCount.textContent = state.maps.length + ' 张';
+        }
+
+        // ---- 标记数据持久化 (含标签自定义状态) ----
+        function saveMarkers() {
+            if (!state.mapLoaded || !state.currentMapId) return;
+            try {
+                const data = {
+                    markers: state.markers,
+                    nextId: state.nextId,
+                };
+                localStorage.setItem(storageKey(state.currentMapId), JSON.stringify(data));
+                // 保存标签自定义状态
+                localStorage.setItem(labelCustomizedKey(state.currentMapId), JSON.stringify(state.labelCustomized));
+            } catch (e) { /* ignore */ }
+        }
+
+        function loadMarkers() {
+            if (!state.mapLoaded || !state.currentMapId) return;
+            try {
+                const raw = localStorage.getItem(storageKey(state.currentMapId));
+                if (!raw) {
+                    state.markers = [];
+                    state.nextId = 1;
+                    state.labelCustomized = {};
+                    return;
+                }
+                const data = JSON.parse(raw);
+                state.markers = data.markers || [];
+                state.nextId = data.nextId || 1;
+                state.markers = state.markers.filter(m =>
+                    m.x >= 0 && m.x <= state.mapWidth &&
+                    m.y >= 0 && m.y <= state.mapHeight
+                );
+
+                // 加载标签自定义状态
+                const customRaw = localStorage.getItem(labelCustomizedKey(state.currentMapId));
+                if (customRaw) {
+                    state.labelCustomized = JSON.parse(customRaw);
+                } else {
+                    state.labelCustomized = {};
+                }
+
+                renderMarkers();
+            } catch (e) { /* ignore */ }
+        }
+
+        // ---- 获取图标对应的默认标签 ----
+        function getDefaultLabel(iconId) {
+            const info = ICON_LIST.find(i => i.id === iconId || i.emoji === iconId);
+            return info ? info.label : '❓';
+        }
+
+        // ---- 备注内容序列化/反序列化 ----
+        function getNoteContent() {
+            const children = editNote.childNodes;
+            let result = [];
+            for (const node of children) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const text = node.textContent.trim();
+                    if (text) result.push({ type: 'text', content: text });
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.tagName === 'IMG') {
+                        result.push({ type: 'image', src: node.src });
+                    } else if (node.tagName === 'DIV' && node.classList.contains('note-img-wrap')) {
+                        const img = node.querySelector('img');
+                        if (img) {
+                            result.push({ type: 'image', src: img.src });
+                        }
+                    } else {
+                        const text = node.textContent.trim();
+                        if (text) result.push({ type: 'text', content: text });
+                    }
+                }
+            }
+            return result;
+        }
+
+        function setNoteContent(data) {
+            editNote.innerHTML = '';
+            if (!data || data.length === 0) return;
+            for (const item of data) {
+                if (item.type === 'text') {
+                    editNote.appendChild(document.createTextNode(item.content));
+                } else if (item.type === 'image' && item.src) {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'note-img-wrap';
+                    const img = document.createElement('img');
+                    img.src = item.src;
+                    img.draggable = false;
+                    const del = document.createElement('button');
+                    del.className = 'img-delete';
+                    del.textContent = '✕';
+                    del.title = '删除图片';
+                    del.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        wrap.remove();
+                        onNoteChange();
+                    });
+                    wrap.appendChild(img);
+                    wrap.appendChild(del);
+                    editNote.appendChild(wrap);
+                }
+            }
+        }
+
+        let noteChangeTimer = null;
+
+        function onNoteChange() {
+            clearTimeout(noteChangeTimer);
+            noteChangeTimer = setTimeout(() => {
+                const id = parseInt(editPanel.dataset.editId);
+                const m = state.markers.find(m => m.id === id);
+                if (!m) return;
+                const content = getNoteContent();
+                m.note = JSON.stringify(content);
+                saveMarkers();
+            }, 200);
+        }
+
+        // ---- 粘贴图片处理 ----
+        editNote.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            let hasImage = false;
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    hasImage = true;
+                    const file = item.getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        const dataURL = ev.target.result;
+                        const wrap = document.createElement('div');
+                        wrap.className = 'note-img-wrap';
+                        const img = document.createElement('img');
+                        img.src = dataURL;
+                        img.draggable = false;
+                        const del = document.createElement('button');
+                        del.className = 'img-delete';
+                        del.textContent = '✕';
+                        del.title = '删除图片';
+                        del.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            wrap.remove();
+                            onNoteChange();
+                        });
+                        wrap.appendChild(img);
+                        wrap.appendChild(del);
+
+                        const sel = window.getSelection();
+                        if (sel.rangeCount > 0) {
+                            const range = sel.getRangeAt(0);
+                            range.deleteContents();
+                            range.insertNode(wrap);
+                            const space = document.createTextNode(' ');
+                            range.setStartAfter(wrap);
+                            range.insertNode(space);
+                            range.setStartAfter(space);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                        } else {
+                            editNote.appendChild(wrap);
+                            editNote.appendChild(document.createTextNode(' '));
+                        }
+                        onNoteChange();
+                        showToast('✅ 图片已粘贴到备注');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+            if (hasImage) {
+                e.preventDefault();
+            }
+        });
+
+        editNote.addEventListener('input', onNoteChange);
+        editNote.addEventListener('blur', () => {
+            clearTimeout(noteChangeTimer);
+            onNoteChange();
+        });
+
+        // ---- 添加标记 ----
+        function addMarker(mapX, mapY) {
+            if (!state.mapLoaded) return;
+            const m = {
+                id: genId(),
+                x: clamp(mapX, 0, state.mapWidth),
+                y: clamp(mapY, 0, state.mapHeight),
+                icon: '❓',
+                label: '❓',
+                note: '[]',
+                size: 32,
+            };
+            state.markers.push(m);
+            // 新标记默认标签未自定义
+            state.labelCustomized[m.id] = false;
+            renderMarkers();
+            saveMarkers();
+            openEditPanel(m.id);
+        }
+
+        // ---- 删除标记 ----
+        function deleteMarker(id) {
+            state.markers = state.markers.filter(m => m.id !== id);
+            delete state.labelCustomized[id];
+            if (state.selectedId === id) state.selectedId = null;
+            renderMarkers();
+            saveMarkers();
+            closeEditPanel();
+        }
+
+        // ---- 编辑面板 ----
+        function openEditPanel(id) {
+            const m = state.markers.find(m => m.id === id);
+            if (!m) return;
+            state.selectedId = id;
+
+            renderIconGrid(m.icon);
+
+            editLabel.value = m.label || '';
+            // 设置标签自定义状态标记
+            editLabel.dataset.customized = state.labelCustomized[m.id] ? 'true' : 'false';
+
+            try {
+                const noteData = JSON.parse(m.note || '[]');
+                setNoteContent(noteData);
+            } catch (e) {
+                editNote.innerHTML = m.note || '';
+            }
+
+            editSize.value = m.size || 32;
+            sizeValue.textContent = m.size || 32;
+
+            const rect = container.getBoundingClientRect();
+            const pos = mapToView(m.x, m.y);
+            const panelW = Math.min(420, window.innerWidth - 40);
+            const panelH = 540;
+
+            let left = pos.x + 20;
+            let top = pos.y - 40;
+
+            if (left + panelW > window.innerWidth - 20) left = pos.x - panelW - 20;
+            if (left < 20) left = 20;
+            if (top + panelH > window.innerHeight - 80) top = window.innerHeight - panelH - 80;
+            if (top < 80) top = 80;
+
+            editPanel.style.left = left + 'px';
+            editPanel.style.top = top + 'px';
+            editPanel.style.display = 'block';
+            editPanel.dataset.editId = id;
+
+            setTimeout(() => editLabel.focus(), 100);
+        }
+
+        function closeEditPanel() {
+            editPanel.style.display = 'none';
+            state.selectedId = null;
+        }
+
+        function renderIconGrid(selectedIcon) {
+            iconGrid.innerHTML = '';
+            for (const info of ICON_LIST) {
+                const div = document.createElement('div');
+                div.className = 'icon-option';
+                if (info.id === selectedIcon || info.emoji === selectedIcon) {
+                    div.classList.add('active');
+                }
+                if (info.file) {
+                    const img = document.createElement('img');
+                    img.src = info.file;
+                    img.alt = info.label;
+                    img.draggable = false;
+                    img.onerror = function() {
+                        this.parentElement.innerHTML = `<span class="emoji">❓</span>`;
+                    };
+                    div.appendChild(img);
+                } else {
+                    const span = document.createElement('span');
+                    span.className = 'emoji';
+                    span.textContent = info.emoji;
+                    div.appendChild(span);
+                }
+                div.dataset.iconId = info.id;
+
+                div.addEventListener('click', () => {
+                    iconGrid.querySelectorAll('.icon-option').forEach(el => el.classList.remove('active'));
+                    div.classList.add('active');
+
+                    const id = parseInt(editPanel.dataset.editId);
+                    const m = state.markers.find(m => m.id === id);
+                    if (!m) return;
+
+                    const newIcon = info.id === 'emoji' ? info.emoji : info.id;
+                    m.icon = newIcon;
+
+                    // 判断标签是否被用户自定义过
+                    const isCustomized = state.labelCustomized[id] || false;
+
+                    // 只有未自定义时，才自动更新标签
+                    if (!isCustomized) {
+                        const defaultLabel = info.label;
+                        m.label = defaultLabel;
+                        editLabel.value = defaultLabel;
+                    }
+
+                    renderMarkers();
+                    saveMarkers();
+                });
+
+                iconGrid.appendChild(div);
+            }
+        }
+
+        // ---- 实时更新事件绑定 ----
+        editLabel.addEventListener('input', () => {
+            const id = parseInt(editPanel.dataset.editId);
+            const m = state.markers.find(m => m.id === id);
+            if (!m) return;
+            const newLabel = editLabel.value.trim() || '标记';
+            m.label = newLabel;
+
+            // 用户手动修改了标签，标记为自定义
+            state.labelCustomized[id] = true;
+
+            renderMarkers();
+            saveMarkers();
+        });
+
+        editSize.addEventListener('input', () => {
+            sizeValue.textContent = editSize.value;
+            const id = parseInt(editPanel.dataset.editId);
+            const m = state.markers.find(m => m.id === id);
+            if (!m) return;
+            m.size = parseInt(editSize.value);
+            renderMarkers();
+            saveMarkers();
+        });
+
+        // ---- 复位视图 ----
+        function resetView() {
+            if (!state.mapLoaded) return;
+            const rect = container.getBoundingClientRect();
+            const pad = 40;
+            const availW = rect.width - pad;
+            const availH = rect.height - pad;
+            const scaleX = availW / state.mapWidth;
+            const scaleY = availH / state.mapHeight;
+            state.scale = clamp(Math.min(scaleX, scaleY), 0.1, 5);
+            state.translateX = (rect.width - state.mapWidth * state.scale) / 2;
+            state.translateY = (rect.height - state.mapHeight * state.scale) / 2;
+            updateTransform();
+            updateZoomDisplay();
+            renderMarkers();
+        }
+
+        // ---- 切换标签 ----
+        function toggleLabels() {
+            state.showLabels = !state.showLabels;
+            renderMarkers();
+            document.getElementById('btnToggleLabels').style.opacity = state.showLabels ? '1' : '0.4';
+        }
+
+        // ---- 清空当前地图的标记 ----
+        function clearAllMarkers() {
+            if (!state.mapLoaded || state.markers.length === 0) return;
+            if (!confirm('⚠️ 确定要清空当前地图的所有标记吗？此操作不可撤销！')) return;
+            state.markers = [];
+            state.labelCustomized = {};
+            renderMarkers();
+            saveMarkers();
+            closeEditPanel();
+            showToast('🧹 已清空所有标记', 1500);
+        }
+
+        // ---- 右键菜单 ----
+        let contextPos = { x: 0, y: 0 };
+
+        container.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (!state.mapLoaded) return;
+            if (e.target.closest('.marker')) return;
+            if (e.target.closest('#edit-panel')) return;
+
+            contextPos.x = e.clientX;
+            contextPos.y = e.clientY;
+
+            const menuW = 180,
+                menuH = 100;
+            let left = e.clientX;
+            let top = e.clientY;
+            if (left + menuW > window.innerWidth - 10) left = window.innerWidth - menuW - 10;
+            if (top + menuH > window.innerHeight - 10) top = window.innerHeight - menuH - 10;
+            if (left < 10) left = 10;
+            if (top < 60) top = 60;
+
+            contextMenu.style.left = left + 'px';
+            contextMenu.style.top = top + 'px';
+            contextMenu.style.display = 'block';
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!contextMenu.contains(e.target)) {
+                contextMenu.style.display = 'none';
+            }
+            if (editPanel.style.display === 'block') {
+                const isClickInsidePanel = editPanel.contains(e.target);
+                const isClickOnMarker = e.target.closest('.marker');
+                const isClickOnContext = contextMenu.contains(e.target);
+                const isClickOnToolbar = e.target.closest('.toolbar');
+                if (!isClickInsidePanel && !isClickOnMarker && !isClickOnContext && !isClickOnToolbar) {
+                    closeEditPanel();
+                }
+            }
+        });
+
+        document.getElementById('ctxAddMarker').addEventListener('click', () => {
+            contextMenu.style.display = 'none';
+            if (!state.mapLoaded) return;
+            const rect = container.getBoundingClientRect();
+            const vx = contextPos.x - rect.left;
+            const vy = contextPos.y - rect.top;
+            const mapPos = viewToMap(vx, vy);
+            if (mapPos.x >= 0 && mapPos.x <= state.mapWidth &&
+                mapPos.y >= 0 && mapPos.y <= state.mapHeight) {
+                addMarker(mapPos.x, mapPos.y);
+            }
+        });
+
+        document.getElementById('ctxCancel').addEventListener('click', () => {
+            contextMenu.style.display = 'none';
+        });
+
+        // ---- 面板事件 ----
+        document.getElementById('panelClose').addEventListener('click', closeEditPanel);
+        document.getElementById('btnDeleteMarker').addEventListener('click', () => {
+            const id = parseInt(editPanel.dataset.editId);
+            if (id) deleteMarker(id);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeEditPanel();
+                contextMenu.style.display = 'none';
+            }
+        });
+
+        // ---- 工具栏按钮 ----
+        document.getElementById('btnZoomIn').addEventListener('click', () => {
+            state.scale = clamp(state.scale * 1.2, 0.1, 20);
+            const rect = container.getBoundingClientRect();
+            const cx = rect.width / 2;
+            const cy = rect.height / 2;
+            const mapPos = viewToMap(cx, cy);
+            state.translateX = cx - mapPos.x * state.scale;
+            state.translateY = cy - mapPos.y * state.scale;
+            updateTransform();
+            updateZoomDisplay();
+            renderMarkers();
+        });
+
+        document.getElementById('btnZoomOut').addEventListener('click', () => {
+            state.scale = clamp(state.scale / 1.2, 0.1, 20);
+            const rect = container.getBoundingClientRect();
+            const cx = rect.width / 2;
+            const cy = rect.height / 2;
+            const mapPos = viewToMap(cx, cy);
+            state.translateX = cx - mapPos.x * state.scale;
+            state.translateY = cy - mapPos.y * state.scale;
+            updateTransform();
+            updateZoomDisplay();
+            renderMarkers();
+        });
+
+        document.getElementById('btnResetView').addEventListener('click', resetView);
+        document.getElementById('btnToggleLabels').addEventListener('click', toggleLabels);
+        document.getElementById('btnToggleLabels').style.opacity = '1';
+
+        document.getElementById('btnClearAll').addEventListener('click', clearAllMarkers);
+        document.getElementById('btnDeleteMap').addEventListener('click', deleteCurrentMap);
+
+        // ---- 地图选择器事件 ----
+        mapSelector.addEventListener('change', (e) => {
+            const mapId = e.target.value;
+            if (mapId) {
+                switchMap(mapId);
+            } else {
+                if (state.currentMapId) {
+                    saveMarkers();
+                }
+                state.mapLoaded = false;
+                state.markers = [];
+                state.currentMapId = null;
+                state.labelCustomized = {};
+                mapImage.src = '';
+                emptyHint.classList.add('show');
+                renderMarkers();
+            }
+        });
+
+        // ---- 导入地图 ----
+        document.getElementById('mapFileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const name = file.name.replace(/\.[^.]+$/, '');
+                const existing = state.maps.find(m => m.name === name);
+                if (existing) {
+                    if (!confirm(`已存在地图 "${name}"，是否覆盖？`)) {
+                        e.target.value = '';
+                        return;
+                    }
+                    localStorage.removeItem(storageKey(existing.id));
+                    localStorage.removeItem(labelCustomizedKey(existing.id));
+                    state.maps = state.maps.filter(m => m.id !== existing.id);
+                }
+                addNewMap(file);
+            }
+            e.target.value = '';
+        });
+
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            container.style.border = '2px dashed rgba(102,126,234,0.5)';
+        });
+        container.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            container.style.border = 'none';
+        });
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            container.style.border = 'none';
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type.startsWith('image/')) {
+                const file = files[0];
+                const name = file.name.replace(/\.[^.]+$/, '');
+                const existing = state.maps.find(m => m.name === name);
+                if (existing) {
+                    if (!confirm(`已存在地图 "${name}"，是否覆盖？`)) return;
+                    localStorage.removeItem(storageKey(existing.id));
+                    localStorage.removeItem(labelCustomizedKey(existing.id));
+                    state.maps = state.maps.filter(m => m.id !== existing.id);
+                }
+                addNewMap(file);
+            }
+        });
+
+        // ---- 窗口自适应 ----
+        let resizeTimer = null;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                if (state.mapLoaded) {
+                    const rect = container.getBoundingClientRect();
+                    const margin = 200;
+                    const minX = -state.mapWidth * state.scale + margin;
+                    const maxX = rect.width - margin;
+                    const minY = -state.mapHeight * state.scale + margin;
+                    const maxY = rect.height - margin;
+                    state.translateX = clamp(state.translateX, minX, maxX);
+                    state.translateY = clamp(state.translateY, minY, maxY);
+                    updateTransform();
+                    renderMarkers();
+                }
+            }, 200);
+        });
+
+        // ---- 初始化 ----
+        state.showLabels = true;
+        console.log('🗺️ 二游地图资源标记工具 (图标切换自动更新标签)');
+        console.log('📌 右键点击地图 → 添加标记');
+        console.log('🖱️ 拖拽标记 → 移动位置');
+        console.log('🖱️ 单击标记 → 编辑');
+        console.log('🎨 切换图标 → 标签自动跟随 (若未手动修改)');
+        console.log('📝 手动修改标签 → 锁定自定义，不再跟随图标变化');
+
+        // 加载地图列表
+        loadAllMapsData().then(maps => {
+            if (maps && maps.length > 0) {
+                state.maps = maps;
+                updateMapSelector();
+
+                const firstMap = state.maps[0];
+                if (firstMap) {
+                    loadMapFromData(firstMap.dataURL, firstMap.id, firstMap.name, firstMap.width, firstMap.height);
+                }
+            } else {
+                emptyHint.classList.add('show');
+                updateMapSelector();
+            }
+        });
+    </script>
+</body>
+</html>
