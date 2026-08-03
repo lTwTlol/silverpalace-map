@@ -719,14 +719,13 @@
                 min-height: 80px;
                 max-height: 200px;
             }
-            /* 移动端面板宽度调整 */
             #marker-list-panel {
                 width: 220px !important;
             }
             #panel-handle {
                 right: 220px !important;
             }
-            #marker-list-panel.collapsed #panel-handle {
+            #marker-list-panel.collapsed~#panel-handle {
                 right: 0 !important;
             }
         }
@@ -944,7 +943,6 @@
             transition: right 0.35s cubic-bezier(0.22, 1, 0.36, 1),
                 background 0.2s, color 0.2s, box-shadow 0.2s;
             right: 280px;
-            /* 默认在面板左侧边缘 */
             box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
             user-select: none;
         }
@@ -956,11 +954,9 @@
         #panel-handle:active {
             transform: translateY(-50%) scale(0.95);
         }
-        /* 面板收起时手柄移到最右侧 */
         #marker-list-panel.collapsed~#panel-handle {
             right: 0;
         }
-        /* 手柄上的箭头 */
         #panel-handle .arrow {
             display: flex;
             align-items: center;
@@ -969,12 +965,9 @@
             height: 100%;
             transition: transform 0.3s;
         }
-        /* 面板展开时箭头朝左 (◀) ，收起时朝右 (▶) */
         #marker-list-panel.collapsed~#panel-handle .arrow {
             transform: scaleX(-1);
         }
-
-        /* 手柄小提示条 (视觉装饰) */
         #panel-handle::after {
             content: '';
             position: absolute;
@@ -986,14 +979,11 @@
             background: rgba(255, 255, 255, 0.06);
             border-radius: 4px;
         }
-
-        /* 面板收起时手柄的微调 */
         #marker-list-panel.collapsed~#panel-handle {
             border-radius: 10px 0 0 10px;
             border-color: rgba(255, 255, 255, 0.08);
         }
 
-        /* ===== 响应式：手柄位置自适应 ===== */
         @media (max-width: 640px) {
             #panel-handle {
                 right: 220px;
@@ -1083,7 +1073,7 @@
         </div>
     </div>
 
-    <!-- 独立手柄 (在面板左侧边缘外侧) -->
+    <!-- 独立手柄 -->
     <div id="panel-handle" title="展开/收起标记列表">
         <span class="arrow">◀</span>
     </div>
@@ -1137,12 +1127,11 @@
     <script>
         // ============================================================
         //  🗺️ 白银之城资源标记工具
-        //  优化: 鼠标悬停显示标签 | 右侧标记列表 (手柄在左侧边缘外侧)
-        //  列表显示用户自定义标签 | 点击列表项隐藏/显示对应类型
+        //  优化: 点击图标不会位移 (拖动阈值) | 标记列表按(图标+标签)分组
         // ============================================================
 
         // ============================================================
-        //  📋 配置你的地图和图标
+        //  📋 配置
         // ============================================================
         const MAP_CONFIG = {
             maps: [
@@ -1164,7 +1153,6 @@
             { id: 'emoji_flag', label: '🚩', emoji: '🚩' },
         ];
 
-        // ---- 构建图标列表 ----
         let ICON_LIST = [];
         for (const icon of MAP_CONFIG.icons) ICON_LIST.push({ ...icon });
         for (const fallback of FALLBACK_ICONS) {
@@ -1186,6 +1174,7 @@
             currentMapId: null,
             maps: [],
             labelCustomized: {},
+            // 隐藏状态 key = "icon|label"  (组合键)
             hiddenTypes: {},
         };
 
@@ -1308,15 +1297,23 @@
             return `<span class="emoji" style="font-size:${size * 0.7}px;">${info ? info.emoji || '❓' : '❓'}</span>`;
         }
 
+        // ---- 构建组合键 ----
+        function getGroupKey(icon, label) {
+            return icon + '|' + (label || '');
+        }
+
         // ---- 渲染标记 ----
         function renderMarkers() {
             markerContainer.innerHTML = '';
             if (!state.mapLoaded) return;
             const sorted = [...state.markers].sort((a, b) => a.id - b.id);
-            const hiddenSet = new Set(Object.keys(state.hiddenTypes).filter(k => state.hiddenTypes[k] === true));
+            const hiddenSet = new Set();
+            for (const key of Object.keys(state.hiddenTypes)) {
+                if (state.hiddenTypes[key] === true) hiddenSet.add(key);
+            }
             for (const m of sorted) {
-                const iconKey = m.icon;
-                if (hiddenSet.has(iconKey)) continue;
+                const groupKey = getGroupKey(m.icon, m.label);
+                if (hiddenSet.has(groupKey)) continue;
 
                 const pos = mapToView(m.x, m.y);
                 const size = m.size || 32;
@@ -1374,6 +1371,11 @@
                     el.title = '';
                 });
 
+                // ---------- 拖动逻辑 (带阈值) ----------
+                let dragStartX = 0,
+                    dragStartY = 0;
+                let hasMoved = false;
+
                 el.addEventListener('mousedown', (e) => {
                     if (e.button !== 0) return;
                     e.stopPropagation();
@@ -1381,91 +1383,45 @@
                     const size = m.size || 32;
                     const offsetX = (e.clientX - rect.left) * (size / rect.width);
                     const offsetY = (e.clientY - rect.top) * (size / rect.height);
-                    window._dragData = { id: m.id, offsetX: offsetX, offsetY: offsetY };
+                    dragStartX = e.clientX;
+                    dragStartY = e.clientY;
+                    hasMoved = false;
+                    window._dragData = {
+                        id: m.id,
+                        offsetX: offsetX,
+                        offsetY: offsetY,
+                        startX: dragStartX,
+                        startY: dragStartY,
+                    };
                     isDraggingMarker = false;
                 });
+
                 el.addEventListener('click', (e) => {
                     if (isDraggingMarker) return;
                     e.stopPropagation();
                     openEditPanel(m.id);
                 });
+
                 markerContainer.appendChild(el);
             }
             if (state.mapLoaded) emptyHint.classList.remove('show');
             renderMarkerList();
         }
 
-        // ---- 渲染标记列表 (使用用户自定义标签) ----
-        function renderMarkerList() {
-            if (!state.mapLoaded) {
-                markerListBody.innerHTML = `<div class="empty-list"><span class="big">🗺️</span>请先加载地图</div>`;
-                return;
-            }
-            if (state.markers.length === 0) {
-                markerListBody.innerHTML = `<div class="empty-list"><span class="big">📍</span>暂无标记<br /><span style="font-size:12px;color:#444;">右键地图添加标记</span></div>`;
-                return;
-            }
-
-            // 按 icon 分组
-            const groups = {};
-            for (const m of state.markers) {
-                const key = m.icon;
-                if (!groups[key]) groups[key] = [];
-                groups[key].push(m);
-            }
-
-            let html = '';
-            const sortedKeys = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
-            for (const key of sortedKeys) {
-                const items = groups[key];
-                const count = items.length;
-
-                // ★★★ 修复：使用该组中第一个标记的 label 作为显示名称 (用户自定义标签) ★★★
-                // 如果组内 label 不统一，取第一个标记的 label
-                const firstLabel = items[0].label || getIconLabel(key) || key;
-                // 如果该组所有标记的 label 都相同，直接显示；否则显示 "多种标签" 加括号提示
-                const allSame = items.every(m => m.label === firstLabel);
-                const displayLabel = allSame ? firstLabel : `${firstLabel} 等`;
-
-                const isHidden = state.hiddenTypes[key] === true;
-                const iconHtml = getIconRender(key, 24);
-
-                html += `
-                    <div class="marker-list-item ${isHidden ? 'hidden-state' : ''}" data-icon="${key}">
-                        <div class="item-icon">${iconHtml}</div>
-                        <div class="item-info">
-                            <span class="item-label">${displayLabel}</span>
-                            <span class="item-count">${count}</span>
-                            <span class="item-hide-badge">隐藏</span>
-                        </div>
-                    </div>
-                `;
-            }
-
-            markerListBody.innerHTML = html;
-
-            // 绑定点击事件：切换隐藏/显示
-            document.querySelectorAll('.marker-list-item').forEach(el => {
-                el.addEventListener('click', () => {
-                    const icon = el.dataset.icon;
-                    if (!icon) return;
-                    state.hiddenTypes[icon] = !state.hiddenTypes[icon];
-                    try {
-                        localStorage.setItem(hiddenTypesKey(state.currentMapId), JSON.stringify(state.hiddenTypes));
-                    } catch (e) { /* ignore */ }
-                    renderMarkers();
-                    const label = el.querySelector('.item-label')?.textContent || icon;
-                    showToast(state.hiddenTypes[icon] ? `👁️ 已隐藏 "${label}"` :
-                        `👁️ 已显示 "${label}"`, 1200);
-                });
-            });
-        }
-
-        // ---- 全局拖拽 ----
+        // ---- 全局拖拽 (带阈值) ----
         let mapDrag = null;
         document.addEventListener('mousemove', (e) => {
             if (window._dragData) {
-                const { id, offsetX, offsetY } = window._dragData;
+                const { id, offsetX, offsetY, startX, startY } = window._dragData;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 5) {
+                    // 未达到拖动阈值，不处理
+                    return;
+                }
+                // 标记为拖动
+                isDraggingMarker = true;
                 const rect = container.getBoundingClientRect();
                 const vx = e.clientX - rect.left - offsetX;
                 const vy = e.clientY - rect.top - offsetY;
@@ -1474,7 +1430,6 @@
                 if (m) {
                     m.x = clamp(mapPos.x, 0, state.mapWidth);
                     m.y = clamp(mapPos.y, 0, state.mapHeight);
-                    isDraggingMarker = true;
                     renderMarkers();
                     saveMarkers();
                 }
@@ -1493,6 +1448,10 @@
         });
         document.addEventListener('mouseup', () => {
             if (window._dragData) {
+                // 如果未拖动，不执行任何操作（点击由 click 事件处理）
+                if (!isDraggingMarker) {
+                    // 但需要清理，以免残留
+                }
                 window._dragData = null;
                 setTimeout(() => { isDraggingMarker = false; }, 10);
                 container.classList.remove('grabbing');
@@ -2359,12 +2318,73 @@
 
         // ---- 标记列表面板切换 (手柄) ----
         function togglePanel() {
-            const isCollapsed = markerListPanel.classList.toggle('collapsed');
-            // 手柄的箭头方向由 CSS 控制 (通过 ~ 兄弟选择器)
-            // 不需要额外操作
+            markerListPanel.classList.toggle('collapsed');
         }
 
         panelHandle.addEventListener('click', togglePanel);
+
+        // ---- 渲染标记列表 (按 icon+label 分组) ----
+        function renderMarkerList() {
+            if (!state.mapLoaded) {
+                markerListBody.innerHTML = `<div class="empty-list"><span class="big">🗺️</span>请先加载地图</div>`;
+                return;
+            }
+            if (state.markers.length === 0) {
+                markerListBody.innerHTML = `<div class="empty-list"><span class="big">📍</span>暂无标记<br /><span style="font-size:12px;color:#444;">右键地图添加标记</span></div>`;
+                return;
+            }
+
+            // 按 (icon, label) 分组
+            const groups = {};
+            for (const m of state.markers) {
+                const key = getGroupKey(m.icon, m.label);
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(m);
+            }
+
+            let html = '';
+            // 排序：按数量降序
+            const sortedKeys = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
+            for (const key of sortedKeys) {
+                const items = groups[key];
+                const count = items.length;
+                // 从第一个标记获取 icon 和 label
+                const first = items[0];
+                const icon = first.icon;
+                const label = first.label || getIconLabel(icon) || '未命名';
+                const isHidden = state.hiddenTypes[key] === true;
+                const iconHtml = getIconRender(icon, 24);
+
+                html += `
+                    <div class="marker-list-item ${isHidden ? 'hidden-state' : ''}" data-groupkey="${key}">
+                        <div class="item-icon">${iconHtml}</div>
+                        <div class="item-info">
+                            <span class="item-label">${label}</span>
+                            <span class="item-count">${count}</span>
+                            <span class="item-hide-badge">隐藏</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            markerListBody.innerHTML = html;
+
+            // 绑定点击事件：切换隐藏/显示
+            document.querySelectorAll('.marker-list-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    const key = el.dataset.groupkey;
+                    if (!key) return;
+                    state.hiddenTypes[key] = !state.hiddenTypes[key];
+                    try {
+                        localStorage.setItem(hiddenTypesKey(state.currentMapId), JSON.stringify(state.hiddenTypes));
+                    } catch (e) { /* ignore */ }
+                    renderMarkers();
+                    const label = el.querySelector('.item-label')?.textContent || key;
+                    showToast(state.hiddenTypes[key] ? `👁️ 已隐藏 "${label}"` :
+                        `👁️ 已显示 "${label}"`, 1200);
+                });
+            });
+        }
 
         // ---- 窗口自适应 ----
         let resizeTimer = null;
@@ -2381,8 +2401,6 @@
                     updateTransform();
                     renderMarkers();
                 }
-                // 更新手柄位置 (响应式宽度变化)
-                // 手柄的 right 值由 CSS 控制，无需额外操作
             }, 200);
         });
 
@@ -2392,8 +2410,7 @@
 
         state.showLabels = true;
         console.log('🗺️ 白银之城标记工具');
-        console.log('✨ 优化: 鼠标悬停显示标签 | 手柄在面板左侧边缘外侧');
-        console.log('📌 标记列表显示用户自定义标签 | 点击列表项隐藏/显示对应类型');
+        console.log('✨ 优化: 点击不会位移 (拖动阈值) | 列表按 (图标+标签) 分组');
 
         loadAllMapsData().then(savedMaps => {
             if (savedMaps && savedMaps.length > 0) {
