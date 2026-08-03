@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>白银之城 · 标记工具</title>
     <style>
-        /* ===== 全局重置 ===== */
         * {
             margin: 0;
             padding: 0;
@@ -19,8 +18,6 @@
             height: 100vh;
             width: 100vw;
         }
-
-        /* ===== 顶部工具栏 ===== */
         .toolbar {
             position: fixed;
             top: 0;
@@ -125,8 +122,6 @@
             height: 100%;
             cursor: pointer;
         }
-
-        /* ===== 地图选择器 ===== */
         .map-selector-wrap {
             display: flex;
             align-items: center;
@@ -157,8 +152,6 @@
             color: #666;
             white-space: nowrap;
         }
-
-        /* ===== 地图容器 ===== */
         #map-container {
             position: fixed;
             top: 56px;
@@ -172,8 +165,6 @@
         #map-container.grabbing {
             cursor: grabbing;
         }
-
-        /* ===== 地图图层 ===== */
         #map-layer {
             position: absolute;
             top: 0;
@@ -189,8 +180,6 @@
             pointer-events: none;
             image-rendering: auto;
         }
-
-        /* ===== 标记容器 ===== */
         #marker-container {
             position: absolute;
             top: 0;
@@ -298,8 +287,6 @@
         .marker .label-text.hidden {
             display: none;
         }
-
-        /* ===== 右键菜单 ===== */
         #context-menu {
             position: fixed;
             z-index: 999;
@@ -352,8 +339,6 @@
             background: rgba(255, 255, 255, 0.06);
             margin: 4px 12px;
         }
-
-        /* ===== 编辑面板 ===== */
         #edit-panel {
             position: fixed;
             z-index: 500;
@@ -472,8 +457,6 @@
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
         }
-
-        /* ===== 备注富文本编辑器 ===== */
         #editNote {
             width: 100%;
             min-height: 120px;
@@ -544,7 +527,6 @@
         #editNote .note-img-wrap .img-delete:hover {
             background: rgba(248, 113, 113, 0.8);
         }
-
         #edit-panel .field .size-control {
             display: flex;
             align-items: center;
@@ -608,8 +590,6 @@
             background: rgba(34, 197, 94, 0.3);
             color: #86efac;
         }
-
-        /* ===== 空状态提示 ===== */
         .empty-hint {
             position: fixed;
             top: 50%;
@@ -636,8 +616,6 @@
             font-size: 14px;
             opacity: 0.4;
         }
-
-        /* ===== 提示信息 ===== */
         .toast {
             position: fixed;
             bottom: 30px;
@@ -660,8 +638,6 @@
             opacity: 1;
             transform: translateX(-50%) translateY(0);
         }
-
-        /* ===== 响应式 ===== */
         @media (max-width: 640px) {
             .toolbar {
                 padding: 0 12px;
@@ -732,8 +708,6 @@
         .hidden {
             display: none !important;
         }
-
-        /* ===== 加载状态 ===== */
         #loading {
             position: fixed;
             top: 56px;
@@ -766,8 +740,6 @@
         #loading.hidden {
             display: none;
         }
-
-        /* ===== 标记列表 (右侧面板) ===== */
         #marker-list-panel {
             position: fixed;
             top: 56px;
@@ -789,7 +761,6 @@
         #marker-list-panel.collapsed {
             transform: translateX(100%);
         }
-
         #marker-list-panel .panel-header {
             display: flex;
             justify-content: space-between;
@@ -822,7 +793,6 @@
             background: rgba(255, 255, 255, 0.15);
             border-radius: 8px;
         }
-
         .marker-list-item {
             display: flex;
             align-items: center;
@@ -906,7 +876,6 @@
         .marker-list-item.hidden-state .item-hide-badge {
             display: inline-block;
         }
-
         #marker-list-panel .empty-list {
             text-align: center;
             color: #555;
@@ -920,8 +889,6 @@
             margin-bottom: 8px;
             opacity: 0.5;
         }
-
-        /* ===== 手柄 (独立于面板, 固定在右侧边缘) ===== */
         #panel-handle {
             position: fixed;
             z-index: 91;
@@ -983,7 +950,6 @@
             border-radius: 10px 0 0 10px;
             border-color: rgba(255, 255, 255, 0.08);
         }
-
         @media (max-width: 640px) {
             #panel-handle {
                 right: 220px;
@@ -998,59 +964,44 @@
     </style>
 </head>
 <body>
-    <!-- 加载状态 -->
+
     <div id="loading">
         <div class="spinner"></div>
         <span>🔄 正在加载地图资源...</span>
     </div>
 
-    <!-- 工具栏 -->
     <header class="toolbar">
         <span class="brand">🗺️ 白银之城标记</span>
         <span class="sep"></span>
-
         <div class="map-selector-wrap">
-            <select id="mapSelector">
-                <option value="">-- 选择地图 --</option>
-            </select>
+            <select id="mapSelector"><option value="">-- 选择地图 --</option></select>
             <span class="map-count" id="mapCount">0 张</span>
         </div>
-
         <span class="sep"></span>
-
         <div class="file-input-wrap">
             <button class="btn btn-success">📥 导入地图</button>
             <input type="file" id="mapFileInput" accept="image/*" />
         </div>
-
         <span class="sep"></span>
-
         <button class="btn" id="btnZoomIn">🔍+</button>
         <span class="zoom-info" id="zoomDisplay">100%</span>
         <button class="btn" id="btnZoomOut">🔍−</button>
         <button class="btn" id="btnResetView">⟲ 复位</button>
-
         <span class="spacer"></span>
-
         <button class="btn btn-warning" id="btnExportData">📤 导出标记数据</button>
         <div class="file-input-wrap">
             <button class="btn btn-primary">📥 导入标记数据</button>
             <input type="file" id="dataFileInput" accept=".json" />
         </div>
-
         <span class="sep"></span>
-
         <button class="btn" id="btnToggleLabels">🏷️ 标签</button>
         <button class="btn" id="btnDeleteMap" style="color:#f87171;">🗑️ 删除地图</button>
         <button class="btn" id="btnClearAll" style="color:#f87171;">🧹 清空标记</button>
         <button class="btn" id="btnReload">🔄 刷新资源</button>
     </header>
 
-    <!-- 地图容器 -->
     <div id="map-container">
-        <div id="map-layer">
-            <img id="mapImage" src="" alt="游戏地图" draggable="false" />
-        </div>
+        <div id="map-layer"><img id="mapImage" src="" alt="游戏地图" draggable="false" /></div>
         <div id="marker-container"></div>
         <div class="empty-hint show" id="emptyHint">
             <span class="big">🖼️</span>
@@ -1059,80 +1010,38 @@
         </div>
     </div>
 
-    <!-- 标记列表 (右侧面板) -->
     <div id="marker-list-panel">
-        <div class="panel-header">
-            <span class="title">📋 标记列表</span>
-        </div>
+        <div class="panel-header"><span class="title">📋 标记列表</span></div>
         <div class="panel-body" id="markerListBody">
-            <div class="empty-list">
-                <span class="big">📍</span>
-                暂无标记<br />
-                <span style="font-size:12px;color:#444;">右键地图添加标记</span>
-            </div>
+            <div class="empty-list"><span class="big">📍</span>暂无标记<br /><span style="font-size:12px;color:#444;">右键地图添加标记</span></div>
         </div>
     </div>
 
-    <!-- 独立手柄 -->
-    <div id="panel-handle" title="展开/收起标记列表">
-        <span class="arrow">◀</span>
-    </div>
+    <div id="panel-handle" title="展开/收起标记列表"><span class="arrow">◀</span></div>
 
-    <!-- 右键菜单 -->
     <div id="context-menu">
-        <button class="menu-item" id="ctxAddMarker">
-            <span class="icon">➕</span> 添加标记
-        </button>
+        <button class="menu-item" id="ctxAddMarker"><span class="icon">➕</span> 添加标记</button>
         <div class="menu-divider"></div>
-        <button class="menu-item" id="ctxCancel">
-            <span class="icon">✖️</span> 取消
-        </button>
+        <button class="menu-item" id="ctxCancel"><span class="icon">✖️</span> 取消</button>
     </div>
 
-    <!-- 编辑面板 -->
     <div id="edit-panel">
-        <div class="panel-header">
-            <h3>✏️ 编辑标记</h3>
-            <button class="panel-close" id="panelClose">✕</button>
-        </div>
-        <div class="field">
-            <label>🎨 图标</label>
-            <div class="icon-grid" id="iconGrid"></div>
-        </div>
-        <div class="field">
-            <label>🏷️ 标签</label>
-            <input type="text" id="editLabel" placeholder="输入标签名称" />
-            <div style="font-size:11px;color:#666;margin-top:4px;">💡 切换图标时标签会自动跟随（除非您手动修改过）</div>
-        </div>
-        <div class="field">
-            <label>📝 备注 <span style="color:#666;font-weight:400;text-transform:none;font-size:11px;"></span></label>
-            <div id="editNote" contenteditable="true"></div>
-        </div>
-        <div class="field">
-            <label>📏 图标大小</label>
-            <div class="size-control">
-                <input type="range" id="editSize" min="16" max="64" value="32" step="1" />
-                <span class="size-value" id="sizeValue">32</span>
-            </div>
-        </div>
-        <div class="panel-actions">
-            <button class="btn-delete" id="btnDeleteMarker">🗑️ 删除</button>
-            <button class="btn-found" id="btnFoundMarker">✅ 已找到</button>
-        </div>
+        <div class="panel-header"><h3>✏️ 编辑标记</h3><button class="panel-close" id="panelClose">✕</button></div>
+        <div class="field"><label>🎨 图标</label><div class="icon-grid" id="iconGrid"></div></div>
+        <div class="field"><label>🏷️ 标签</label><input type="text" id="editLabel" placeholder="输入标签名称" /><div style="font-size:11px;color:#666;margin-top:4px;">💡 切换图标时标签会自动跟随（除非您手动修改过）</div></div>
+        <div class="field"><label>📝 备注 <span style="color:#666;font-weight:400;text-transform:none;font-size:11px;"></span></label><div id="editNote" contenteditable="true"></div></div>
+        <div class="field"><label>📏 图标大小</label><div class="size-control"><input type="range" id="editSize" min="16" max="64" value="32" step="1" /><span class="size-value" id="sizeValue">32</span></div></div>
+        <div class="panel-actions"><button class="btn-delete" id="btnDeleteMarker">🗑️ 删除</button><button class="btn-found" id="btnFoundMarker">✅ 已找到</button></div>
     </div>
 
-    <!-- Toast 提示 -->
     <div class="toast" id="toast"></div>
 
     <script>
         // ============================================================
-        //  🗺️ 白银之城资源标记工具
-        //  优化: 点击图标不会位移 (拖动阈值) | 标记列表按(图标+标签)分组
+        //  动态密度控制: 缩放 < 100% 时减少渲染图标数量
+        //  核心: renderMarkers 根据当前 scale 计算密度系数
         // ============================================================
 
-        // ============================================================
-        //  📋 配置
-        // ============================================================
         const MAP_CONFIG = {
             maps: [
                 { name: '白银之城', file: 'https://gh-proxy.org/https://raw.githubusercontent.com/lTwTlol/silverpalace-map.github.io/main/map.png' },
@@ -1159,7 +1068,6 @@
             if (!ICON_LIST.find(i => i.id === fallback.id)) ICON_LIST.push({ ...fallback });
         }
 
-        // ---- 状态 ----
         let state = {
             mapLoaded: false,
             mapWidth: 0,
@@ -1174,13 +1082,12 @@
             currentMapId: null,
             maps: [],
             labelCustomized: {},
-            // 隐藏状态 key = "icon|label"  (组合键)
             hiddenTypes: {},
         };
 
         let isDraggingMarker = false;
+        let mapDrag = null;
 
-        // ---- DOM 引用 ----
         const container = document.getElementById('map-container');
         const mapLayer = document.getElementById('map-layer');
         const mapImage = document.getElementById('mapImage');
@@ -1213,7 +1120,7 @@
             toastTimer = setTimeout(() => { toast.classList.remove('show'); }, duration);
         }
 
-        // ---- IndexedDB 工具 ----
+        // ---- IndexedDB ----
         const DB_NAME = 'MapMarkerDB';
         const STORE_NAME = 'mapData';
         const DB_VERSION = 2;
@@ -1282,13 +1189,11 @@
             return { x: (vx - state.translateX) / state.scale, y: (vy - state.translateY) / state.scale };
         }
 
-        // ---- 获取图标的显示名称 ----
         function getIconLabel(iconId) {
             const info = ICON_LIST.find(i => i.id === iconId || i.emoji === iconId);
             return info ? info.label : iconId;
         }
 
-        // ---- 获取图标渲染内容 ----
         function getIconRender(iconId, size = 28) {
             const info = ICON_LIST.find(i => i.id === iconId || i.emoji === iconId);
             if (info && info.file) {
@@ -1297,21 +1202,57 @@
             return `<span class="emoji" style="font-size:${size * 0.7}px;">${info ? info.emoji || '❓' : '❓'}</span>`;
         }
 
-        // ---- 构建组合键 ----
         function getGroupKey(icon, label) {
             return icon + '|' + (label || '');
         }
 
-        // ---- 渲染标记 ----
+        // ---------- 核心: 动态密度渲染 ----------
         function renderMarkers() {
             markerContainer.innerHTML = '';
             if (!state.mapLoaded) return;
-            const sorted = [...state.markers].sort((a, b) => a.id - b.id);
+
+            const allMarkers = state.markers;
+            if (allMarkers.length === 0) {
+                if (state.mapLoaded) emptyHint.classList.remove('show');
+                renderMarkerList();
+                return;
+            }
+
+            // 隐藏类型过滤
             const hiddenSet = new Set();
             for (const key of Object.keys(state.hiddenTypes)) {
                 if (state.hiddenTypes[key] === true) hiddenSet.add(key);
             }
-            for (const m of sorted) {
+
+            // ----- 密度控制 -----
+            // scale 1.0 = 100% 显示全部; scale 0.5 大约显示 25% 的标记 (按面积)
+            // 使用采样步长: 步长 = max(1, Math.floor(1 / (scale * scale)))
+            // 当 scale < 1 时, 步长 > 1, 减少渲染数量
+            const densityFactor = Math.max(0.1, state.scale);
+            // 步长: 在 0.1 缩放时约 10, 1.0 时 1, 大于1时保持1 (全部显示)
+            let step = Math.max(1, Math.floor(1 / (densityFactor * densityFactor)));
+            // 但为了更平滑, 使用对数步长: 但保持简单, 同时保证 100% 时全部显示
+            // 当 scale >= 1.0 时 step = 1
+            if (state.scale >= 1.0) step = 1;
+            // 限制最大步长防止完全看不见
+            step = Math.min(step, 20);
+
+            // 按 id 排序保证稳定
+            const sorted = [...allMarkers].sort((a, b) => a.id - b.id);
+
+            // 构建可见列表: 每隔 step 取一个
+            let visibleMarkers = [];
+            for (let i = 0; i < sorted.length; i += step) {
+                visibleMarkers.push(sorted[i]);
+            }
+
+            // 如果因为步长导致一个都没取到 (极端情况), 至少取第一个
+            if (visibleMarkers.length === 0 && sorted.length > 0) {
+                visibleMarkers.push(sorted[0]);
+            }
+
+            // 渲染可见标记
+            for (const m of visibleMarkers) {
                 const groupKey = getGroupKey(m.icon, m.label);
                 if (hiddenSet.has(groupKey)) continue;
 
@@ -1325,7 +1266,6 @@
                 el.style.top = pos.y + 'px';
                 el.style.width = size + 'px';
                 el.style.height = size + 'px';
-
                 el.dataset.label = m.label || getIconLabel(m.icon) || '标记';
 
                 const wrap = document.createElement('div');
@@ -1353,7 +1293,6 @@
                 badge.className = 'check-badge';
                 badge.textContent = '✓';
                 wrap.appendChild(badge);
-
                 el.appendChild(wrap);
 
                 if (state.showLabels && m.label) {
@@ -1367,11 +1306,9 @@
                     const label = el.dataset.label;
                     if (label) el.title = label;
                 });
-                el.addEventListener('mouseleave', () => {
-                    el.title = '';
-                });
+                el.addEventListener('mouseleave', () => { el.title = ''; });
 
-                // ---------- 拖动逻辑 (带阈值) ----------
+                // 拖拽逻辑 (带阈值)
                 let dragStartX = 0,
                     dragStartY = 0;
                 let hasMoved = false;
@@ -1404,23 +1341,19 @@
 
                 markerContainer.appendChild(el);
             }
+
             if (state.mapLoaded) emptyHint.classList.remove('show');
             renderMarkerList();
         }
 
-        // ---- 全局拖拽 (带阈值) ----
-        let mapDrag = null;
+        // ---- 全局拖拽 ----
         document.addEventListener('mousemove', (e) => {
             if (window._dragData) {
                 const { id, offsetX, offsetY, startX, startY } = window._dragData;
                 const dx = e.clientX - startX;
                 const dy = e.clientY - startY;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 5) {
-                    // 未达到拖动阈值，不处理
-                    return;
-                }
-                // 标记为拖动
+                if (dist < 5) return;
                 isDraggingMarker = true;
                 const rect = container.getBoundingClientRect();
                 const vx = e.clientX - rect.left - offsetX;
@@ -1446,12 +1379,10 @@
                 e.preventDefault();
             }
         });
+
         document.addEventListener('mouseup', () => {
             if (window._dragData) {
-                // 如果未拖动，不执行任何操作（点击由 click 事件处理）
-                if (!isDraggingMarker) {
-                    // 但需要清理，以免残留
-                }
+                if (!isDraggingMarker) {}
                 window._dragData = null;
                 setTimeout(() => { isDraggingMarker = false; }, 10);
                 container.classList.remove('grabbing');
@@ -1460,6 +1391,7 @@
             if (mapDrag) { mapDrag = null;
                 container.classList.remove('grabbing'); }
         });
+
         container.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
             if (e.target.closest('.marker')) return;
@@ -1468,6 +1400,7 @@
             mapDrag = { startX: e.clientX, startY: e.clientY, tx: state.translateX, ty: state.translateY };
             container.classList.add('grabbing');
         });
+
         container.addEventListener('wheel', (e) => {
             e.preventDefault();
             const delta = e.deltaY > 0 ? -0.08 : 0.08;
@@ -1480,8 +1413,8 @@
             state.translateX = mx - mapPos.x * state.scale;
             state.translateY = my - mapPos.y * state.scale;
             updateTransform();
-            renderMarkers();
             updateZoomDisplay();
+            renderMarkers(); // 密度变化触发重绘
         }, { passive: false });
 
         function updateTransform() {
@@ -1508,10 +1441,8 @@
                 existing.width = width;
                 existing.height = height;
             }
-
             saveAllMapsData(state.maps);
             updateMapSelector();
-
             mapImage.src = imageUrl;
             mapImage.style.width = width + 'px';
             mapImage.style.height = height + 'px';
@@ -1526,13 +1457,11 @@
             updateTransform();
             updateZoomDisplay();
             emptyHint.classList.remove('show');
-
             loadMarkers();
             renderMarkers();
             mapSelector.value = mapId;
             showToast('✅ 已加载: ' + (mapName || '未命名地图'));
             loading.classList.add('hidden');
-
             autoLoadFromRepo();
         }
 
@@ -1573,13 +1502,10 @@
             autoLoadFromRepo();
         }
 
-        // ---- 从仓库加载地图 ----
         function loadMapFromRepo(mapConfig) {
             const filePath = mapConfig.file;
-            console.log('📂 尝试加载地图:', filePath);
             const img = new Image();
             img.onload = () => {
-                console.log('✅ 地图加载成功:', filePath);
                 const mapId = generateMapId();
                 const mapName = mapConfig.name || filePath.replace(/\.[^.]+$/, '');
                 state.maps.push({
@@ -1596,7 +1522,6 @@
                 checkAllImagesLoaded();
             };
             img.onerror = () => {
-                console.warn('⚠️ 加载地图失败:', filePath);
                 imageLoadCount++;
                 checkAllImagesLoaded();
             };
@@ -1647,10 +1572,7 @@
         }
 
         function autoLoadFromRepo() {
-            if (!state.mapLoaded) {
-                setTimeout(autoLoadFromRepo, 500);
-                return;
-            }
+            if (!state.mapLoaded) { setTimeout(autoLoadFromRepo, 500); return; }
             const hasLocalData = localStorage.getItem(storageKey(state.currentMapId));
             if (hasLocalData && state.markers.length > 0) return;
             const jsonUrl = 'https://gh-proxy.org/https://raw.githubusercontent.com/lTwTlol/silverpalace-map.github.io/main/map_editor_state.json';
@@ -1667,10 +1589,7 @@
                 .catch(err => { /* ignore */ });
         }
 
-        // ============================================================
-        //  导入 / 导出
-        // ============================================================
-
+        // ---- 导入/导出 ----
         function exportMarkers() {
             if (!state.mapLoaded || state.markers.length === 0) {
                 showToast('⚠️ 没有标记可导出', 1500);
@@ -1801,7 +1720,7 @@
             } catch (e) { /* ignore */ }
         }
 
-        // ---- 备注相关 ----
+        // ---- 备注 ----
         function getNoteContent() {
             const children = editNote.childNodes;
             let result = [];
@@ -1907,7 +1826,7 @@
         editNote.addEventListener('blur', () => { clearTimeout(noteChangeTimer);
             onNoteChange(); });
 
-        // ---- 添加标记 ----
+        // ---- 添加/删除标记 ----
         function addMarker(mapX, mapY) {
             if (!state.mapLoaded) return;
             const m = {
@@ -1953,7 +1872,7 @@
             showToast(m.found ? '✅ 标记为已找到' : '↩️ 取消已找到状态', 1200);
         }
 
-        // ---- 打开编辑面板 ----
+        // ---- 编辑面板 ----
         function openEditPanel(id) {
             const m = state.markers.find(m => m.id === id);
             if (!m) return;
@@ -1994,7 +1913,6 @@
         function closeEditPanel() { editPanel.style.display = 'none';
             state.selectedId = null; }
 
-        // ---- 图标网格 ----
         function renderIconGrid(selectedIcon) {
             iconGrid.innerHTML = '';
             for (const info of ICON_LIST) {
@@ -2034,7 +1952,6 @@
             }
         }
 
-        // ---- 事件绑定 ----
         editLabel.addEventListener('input', () => {
             const id = parseInt(editPanel.dataset.editId);
             const m = state.markers.find(m => m.id === id);
@@ -2059,7 +1976,6 @@
             if (id) toggleFound(id);
         });
 
-        // ---- 重置视图 ----
         function resetView() {
             if (!state.mapLoaded) return;
             const rect = container.getBoundingClientRect();
@@ -2161,7 +2077,6 @@
         });
         document.getElementById('ctxCancel').addEventListener('click', () => { contextMenu.style.display = 'none'; });
 
-        // ---- 面板事件 ----
         document.getElementById('panelClose').addEventListener('click', closeEditPanel);
         document.getElementById('btnDeleteMarker').addEventListener('click', () => {
             const id = parseInt(editPanel.dataset.editId);
@@ -2172,7 +2087,7 @@
                 contextMenu.style.display = 'none'; }
         });
 
-        // ---- 工具栏按钮 ----
+        // ---- 工具栏 ----
         document.getElementById('btnZoomIn').addEventListener('click', () => {
             state.scale = clamp(state.scale * 1.2, 0.1, 20);
             const rect = container.getBoundingClientRect();
@@ -2203,7 +2118,6 @@
         document.getElementById('btnClearAll').addEventListener('click', clearAllMarkers);
         document.getElementById('btnDeleteMap').addEventListener('click', deleteCurrentMap);
 
-        // ---- 刷新资源 ----
         document.getElementById('btnReload').addEventListener('click', () => {
             state.maps = [];
             state.markers = [];
@@ -2219,7 +2133,6 @@
             showToast('🔄 正在刷新资源...', 1500);
         });
 
-        // ---- 绑定导入/导出 ----
         document.getElementById('btnExportData').addEventListener('click', exportMarkers);
         document.getElementById('dataFileInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -2239,7 +2152,6 @@
             e.target.value = '';
         });
 
-        // ---- 地图选择器 ----
         mapSelector.addEventListener('change', (e) => {
             const mapId = e.target.value;
             if (mapId) {
@@ -2257,7 +2169,6 @@
             }
         });
 
-        // ---- 导入地图 ----
         document.getElementById('mapFileInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file && file.type.startsWith('image/')) {
@@ -2316,14 +2227,12 @@
             }
         });
 
-        // ---- 标记列表面板切换 (手柄) ----
         function togglePanel() {
             markerListPanel.classList.toggle('collapsed');
         }
-
         panelHandle.addEventListener('click', togglePanel);
 
-        // ---- 渲染标记列表 (按 icon+label 分组) ----
+        // ---- 标记列表 ----
         function renderMarkerList() {
             if (!state.mapLoaded) {
                 markerListBody.innerHTML = `<div class="empty-list"><span class="big">🗺️</span>请先加载地图</div>`;
@@ -2334,7 +2243,6 @@
                 return;
             }
 
-            // 按 (icon, label) 分组
             const groups = {};
             for (const m of state.markers) {
                 const key = getGroupKey(m.icon, m.label);
@@ -2343,12 +2251,10 @@
             }
 
             let html = '';
-            // 排序：按数量降序
             const sortedKeys = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
             for (const key of sortedKeys) {
                 const items = groups[key];
                 const count = items.length;
-                // 从第一个标记获取 icon 和 label
                 const first = items[0];
                 const icon = first.icon;
                 const label = first.label || getIconLabel(icon) || '未命名';
@@ -2369,7 +2275,6 @@
 
             markerListBody.innerHTML = html;
 
-            // 绑定点击事件：切换隐藏/显示
             document.querySelectorAll('.marker-list-item').forEach(el => {
                 el.addEventListener('click', () => {
                     const key = el.dataset.groupkey;
@@ -2386,7 +2291,6 @@
             });
         }
 
-        // ---- 窗口自适应 ----
         let resizeTimer = null;
         window.addEventListener('resize', () => {
             clearTimeout(resizeTimer);
@@ -2404,13 +2308,9 @@
             }, 200);
         });
 
-        // ============================================================
-        //  🚀 启动！
-        // ============================================================
-
+        // ---- 启动 ----
         state.showLabels = true;
-        console.log('🗺️ 白银之城标记工具');
-        console.log('✨ 优化: 点击不会位移 (拖动阈值) | 列表按 (图标+标签) 分组');
+        console.log('🗺️ 白银之城标记工具 · 动态密度优化');
 
         loadAllMapsData().then(savedMaps => {
             if (savedMaps && savedMaps.length > 0) {
