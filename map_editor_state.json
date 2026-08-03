@@ -1,7 +1,7 @@
 {
   "version": "1.0",
-  "exportedAt": "2026-08-03T05:55:23.103Z",
-  "mapId": "map_1785678340092_2uog",
+  "exportedAt": "2026-08-03T10:58:00.970Z",
+  "mapId": "map_1785753571180_kva6",
   "mapName": "白银之城",
   "mapWidth": 3676,
   "mapHeight": 2532,
@@ -1794,8 +1794,8 @@
       "id": 187,
       "x": 2601.6157053182674,
       "y": 367.28723007445785,
-      "icon": "宝箱",
-      "label": "宝箱",
+      "icon": "包裹",
+      "label": "包裹",
       "note": "[]",
       "size": 32,
       "found": false
@@ -7405,7 +7405,7 @@
       "x": 640.026866595535,
       "y": 1492.9238253063568,
       "icon": "❓",
-      "label": "❓",
+      "label": "谜题",
       "note": "[]",
       "size": 32,
       "found": false
@@ -9185,7 +9185,7 @@
       "x": 1616.970677626132,
       "y": 1786.812618473106,
       "icon": "❓",
-      "label": "❓",
+      "label": "谜题",
       "note": "[]",
       "size": 32,
       "found": false
@@ -9359,9 +9359,19 @@
       "note": "[]",
       "size": 32,
       "found": false
+    },
+    {
+      "id": 944,
+      "x": 2555.4236502753097,
+      "y": 928.816595389344,
+      "icon": "包裹",
+      "label": "包裹",
+      "note": "[]",
+      "size": 32,
+      "found": false
     }
   ],
-  "nextId": 944,
+  "nextId": 945,
   "labelCustomized": {
     "4": false,
     "5": false,
@@ -10104,7 +10114,7 @@
     "745": false,
     "746": false,
     "747": false,
-    "748": false,
+    "748": true,
     "749": false,
     "750": false,
     "751": false,
@@ -10282,7 +10292,7 @@
     "923": false,
     "924": false,
     "925": false,
-    "926": false,
+    "926": true,
     "927": false,
     "928": false,
     "929": false,
@@ -10299,18 +10309,19 @@
     "940": false,
     "941": true,
     "942": false,
-    "943": false
+    "943": false,
+    "944": false
   },
   "hiddenTypes": {
-    "❓|谜题": false,
+    "❓|谜题": true,
     "❓|❓": false,
     "问号|标记": false,
-    "包裹|包裹": false,
-    "清剿|清剿": false,
-    "信箱|信箱": false,
-    "保险柜|保险柜": false,
-    "问号|捕捉电胞": false,
-    "清剿|强敌": false,
-    "宝箱|宝箱": false
+    "包裹|包裹": true,
+    "清剿|清剿": true,
+    "信箱|信箱": true,
+    "保险柜|保险柜": true,
+    "问号|捕捉电胞": true,
+    "清剿|强敌": true,
+    "宝箱|宝箱": true
   }
 }
