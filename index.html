@@ -219,7 +219,6 @@
             filter: brightness(1.2) drop-shadow(0 0 12px rgba(255, 255, 255, 0.25));
             z-index: 20;
         }
-        /* 已找到状态：半透明 + 右上角对勾 */
         .marker.found .icon-wrap {
             opacity: 0.5;
             filter: grayscale(0.3);
@@ -259,7 +258,6 @@
             border-radius: 50%;
             background: rgba(0, 0, 0, 0.2);
         }
-        /* 右上角对勾 ✓ */
         .marker .check-badge {
             position: absolute;
             top: -4px;
@@ -721,6 +719,16 @@
                 min-height: 80px;
                 max-height: 200px;
             }
+            /* 移动端面板宽度调整 */
+            #marker-list-panel {
+                width: 220px !important;
+            }
+            #panel-handle {
+                right: 220px !important;
+            }
+            #marker-list-panel.collapsed #panel-handle {
+                right: 0 !important;
+            }
         }
         .hidden {
             display: none !important;
@@ -773,15 +781,16 @@
             box-shadow: -10px 0 40px rgba(0, 0, 0, 0.5);
             z-index: 90;
             transform: translateX(0);
-            transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            overflow: visible;
             color: #eee;
         }
         #marker-list-panel.collapsed {
-            transform: translateX(calc(100% - 40px));
+            transform: translateX(100%);
         }
+
         #marker-list-panel .panel-header {
             display: flex;
             justify-content: space-between;
@@ -798,20 +807,6 @@
             background: linear-gradient(135deg, #f093fb, #f5576c);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-        }
-        #marker-list-panel .panel-header .toggle-btn {
-            background: none;
-            border: none;
-            color: #888;
-            font-size: 18px;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 6px;
-            transition: background 0.2s;
-        }
-        #marker-list-panel .panel-header .toggle-btn:hover {
-            background: rgba(255, 255, 255, 0.08);
-            color: #fff;
         }
         #marker-list-panel .panel-body {
             flex: 1;
@@ -927,21 +922,88 @@
             opacity: 0.5;
         }
 
-        /* 快捷键提示 */
-        .shortcut-hint {
-            font-size: 11px;
-            color: #555;
-            margin-left: 6px;
-            font-weight: 400;
-            letter-spacing: 0.3px;
+        /* ===== 手柄 (独立于面板, 固定在右侧边缘) ===== */
+        #panel-handle {
+            position: fixed;
+            z-index: 91;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 22px;
+            height: 56px;
+            background: rgba(24, 24, 44, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-right: none;
+            border-radius: 10px 0 0 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 16px;
+            transition: right 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+                background 0.2s, color 0.2s, box-shadow 0.2s;
+            right: 280px;
+            /* 默认在面板左侧边缘 */
+            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+            user-select: none;
         }
-        .shortcut-hint kbd {
+        #panel-handle:hover {
+            background: rgba(40, 40, 70, 0.95);
+            color: #fff;
+            box-shadow: -4px 0 30px rgba(0, 0, 0, 0.5);
+        }
+        #panel-handle:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+        /* 面板收起时手柄移到最右侧 */
+        #marker-list-panel.collapsed~#panel-handle {
+            right: 0;
+        }
+        /* 手柄上的箭头 */
+        #panel-handle .arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.3s;
+        }
+        /* 面板展开时箭头朝左 (◀) ，收起时朝右 (▶) */
+        #marker-list-panel.collapsed~#panel-handle .arrow {
+            transform: scaleX(-1);
+        }
+
+        /* 手柄小提示条 (视觉装饰) */
+        #panel-handle::after {
+            content: '';
+            position: absolute;
+            left: 3px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 2px;
+            height: 24px;
             background: rgba(255, 255, 255, 0.06);
-            padding: 0 6px;
             border-radius: 4px;
-            font-size: 10px;
-            color: #888;
-            font-family: inherit;
+        }
+
+        /* 面板收起时手柄的微调 */
+        #marker-list-panel.collapsed~#panel-handle {
+            border-radius: 10px 0 0 10px;
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        /* ===== 响应式：手柄位置自适应 ===== */
+        @media (max-width: 640px) {
+            #panel-handle {
+                right: 220px;
+                width: 20px;
+                height: 48px;
+                font-size: 14px;
+            }
+            #marker-list-panel.collapsed~#panel-handle {
+                right: 0;
+            }
         }
     </style>
 </head>
@@ -1010,8 +1072,7 @@
     <!-- 标记列表 (右侧面板) -->
     <div id="marker-list-panel">
         <div class="panel-header">
-            <span class="title">📋 标记列表 <span class="shortcut-hint"><kbd>PgUp</kbd> 展开 <kbd>PgDn</kbd> 收起</span></span>
-            <button class="toggle-btn" id="listToggleBtn" title="切换面板 (PgUp/PgDn)">◀</button>
+            <span class="title">📋 标记列表</span>
         </div>
         <div class="panel-body" id="markerListBody">
             <div class="empty-list">
@@ -1020,6 +1081,11 @@
                 <span style="font-size:12px;color:#444;">右键地图添加标记</span>
             </div>
         </div>
+    </div>
+
+    <!-- 独立手柄 (在面板左侧边缘外侧) -->
+    <div id="panel-handle" title="展开/收起标记列表">
+        <span class="arrow">◀</span>
     </div>
 
     <!-- 右键菜单 -->
@@ -1071,8 +1137,8 @@
     <script>
         // ============================================================
         //  🗺️ 白银之城资源标记工具
-        //  优化: 鼠标悬停显示标签 | 右侧标记列表 (PgUp/PgDn 切换)
-        //  列表支持点击隐藏/显示 (按类型聚合)
+        //  优化: 鼠标悬停显示标签 | 右侧标记列表 (手柄在左侧边缘外侧)
+        //  列表显示用户自定义标签 | 点击列表项隐藏/显示对应类型
         // ============================================================
 
         // ============================================================
@@ -1120,7 +1186,6 @@
             currentMapId: null,
             maps: [],
             labelCustomized: {},
-            // 隐藏状态: key = iconId, value = boolean (true表示隐藏)
             hiddenTypes: {},
         };
 
@@ -1145,8 +1210,8 @@
         const mapSelector = document.getElementById('mapSelector');
         const mapCount = document.getElementById('mapCount');
         const markerListBody = document.getElementById('markerListBody');
-        const listToggleBtn = document.getElementById('listToggleBtn');
         const markerListPanel = document.getElementById('marker-list-panel');
+        const panelHandle = document.getElementById('panel-handle');
 
         let toastTimer = null;
         let imageLoadCount = 0;
@@ -1243,14 +1308,13 @@
             return `<span class="emoji" style="font-size:${size * 0.7}px;">${info ? info.emoji || '❓' : '❓'}</span>`;
         }
 
-        // ---- 渲染标记（增加悬停标签支持） ----
+        // ---- 渲染标记 ----
         function renderMarkers() {
             markerContainer.innerHTML = '';
             if (!state.mapLoaded) return;
             const sorted = [...state.markers].sort((a, b) => a.id - b.id);
             const hiddenSet = new Set(Object.keys(state.hiddenTypes).filter(k => state.hiddenTypes[k] === true));
             for (const m of sorted) {
-                // 如果该类型被隐藏，跳过渲染
                 const iconKey = m.icon;
                 if (hiddenSet.has(iconKey)) continue;
 
@@ -1265,7 +1329,6 @@
                 el.style.width = size + 'px';
                 el.style.height = size + 'px';
 
-                // 自定义属性存储标签名，用于悬停显示
                 el.dataset.label = m.label || getIconLabel(m.icon) || '标记';
 
                 const wrap = document.createElement('div');
@@ -1296,7 +1359,6 @@
 
                 el.appendChild(wrap);
 
-                // 标签（可显示/隐藏）
                 if (state.showLabels && m.label) {
                     const labelEl = document.createElement('div');
                     labelEl.className = 'label-text';
@@ -1304,15 +1366,9 @@
                     el.appendChild(labelEl);
                 }
 
-                // 悬停显示标签（tooltip风格）
                 el.addEventListener('mouseenter', (e) => {
                     const label = el.dataset.label;
-                    if (label && !state.showLabels) {
-                        // 如果全局标签关闭，用title显示
-                        el.title = label;
-                    } else if (label) {
-                        el.title = label;
-                    }
+                    if (label) el.title = label;
                 });
                 el.addEventListener('mouseleave', () => {
                     el.title = '';
@@ -1336,11 +1392,10 @@
                 markerContainer.appendChild(el);
             }
             if (state.mapLoaded) emptyHint.classList.remove('show');
-            // 更新标记列表
             renderMarkerList();
         }
 
-        // ---- 渲染标记列表 (右侧面板) ----
+        // ---- 渲染标记列表 (使用用户自定义标签) ----
         function renderMarkerList() {
             if (!state.mapLoaded) {
                 markerListBody.innerHTML = `<div class="empty-list"><span class="big">🗺️</span>请先加载地图</div>`;
@@ -1360,12 +1415,18 @@
             }
 
             let html = '';
-            // 排序：按数量从多到少
             const sortedKeys = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
             for (const key of sortedKeys) {
                 const items = groups[key];
                 const count = items.length;
-                const label = items[0].label || getIconLabel(key) || key;
+
+                // ★★★ 修复：使用该组中第一个标记的 label 作为显示名称 (用户自定义标签) ★★★
+                // 如果组内 label 不统一，取第一个标记的 label
+                const firstLabel = items[0].label || getIconLabel(key) || key;
+                // 如果该组所有标记的 label 都相同，直接显示；否则显示 "多种标签" 加括号提示
+                const allSame = items.every(m => m.label === firstLabel);
+                const displayLabel = allSame ? firstLabel : `${firstLabel} 等`;
+
                 const isHidden = state.hiddenTypes[key] === true;
                 const iconHtml = getIconRender(key, 24);
 
@@ -1373,7 +1434,7 @@
                     <div class="marker-list-item ${isHidden ? 'hidden-state' : ''}" data-icon="${key}">
                         <div class="item-icon">${iconHtml}</div>
                         <div class="item-info">
-                            <span class="item-label">${label}</span>
+                            <span class="item-label">${displayLabel}</span>
                             <span class="item-count">${count}</span>
                             <span class="item-hide-badge">隐藏</span>
                         </div>
@@ -1388,15 +1449,14 @@
                 el.addEventListener('click', () => {
                     const icon = el.dataset.icon;
                     if (!icon) return;
-                    // 切换隐藏状态
                     state.hiddenTypes[icon] = !state.hiddenTypes[icon];
-                    // 保存到 localStorage
                     try {
                         localStorage.setItem(hiddenTypesKey(state.currentMapId), JSON.stringify(state.hiddenTypes));
                     } catch (e) { /* ignore */ }
                     renderMarkers();
-                    showToast(state.hiddenTypes[icon] ? `👁️ 已隐藏 "${getIconLabel(icon)}"` :
-                        `👁️ 已显示 "${getIconLabel(icon)}"`, 1200);
+                    const label = el.querySelector('.item-label')?.textContent || icon;
+                    showToast(state.hiddenTypes[icon] ? `👁️ 已隐藏 "${label}"` :
+                        `👁️ 已显示 "${label}"`, 1200);
                 });
             });
         }
@@ -1473,7 +1533,7 @@
             zoomDisplay.textContent = Math.round(state.scale * 100) + '%';
         }
 
-        // ---- 地图加载（从远程URL直接加载）----
+        // ---- 地图加载 ----
         function loadMapFromUrl(imageUrl, mapId, mapName, width, height) {
             state.mapWidth = width;
             state.mapHeight = height;
@@ -1517,7 +1577,6 @@
             autoLoadFromRepo();
         }
 
-        // ---- 地图加载（从DataURL本地数据加载）----
         function loadMapFromData(dataURL, mapId, mapName, width, height) {
             state.mapWidth = width;
             state.mapHeight = height;
@@ -1585,9 +1644,7 @@
             img.src = filePath;
         }
 
-        // ---- 检查所有图片是否加载完成 ----
         function checkAllImagesLoaded() {
-            console.log('📊 加载进度:', imageLoadCount, '/', totalImagesToLoad);
             if (imageLoadCount >= totalImagesToLoad) {
                 if (state.maps.length === 0) {
                     loading.classList.add('hidden');
@@ -1608,12 +1665,10 @@
             }
         }
 
-        // ---- 初始化：从仓库加载所有资源 ----
         function initFromRepo() {
             loading.classList.remove('hidden');
             imageLoadCount = 0;
             totalImagesToLoad = MAP_CONFIG.maps.length + MAP_CONFIG.icons.length;
-            console.log('📦 总资源数:', totalImagesToLoad);
             if (totalImagesToLoad === 0) {
                 loading.classList.add('hidden');
                 emptyHint.classList.add('show');
@@ -1632,38 +1687,29 @@
             }
         }
 
-        // ---- 自动从仓库加载 map_editor_state.json ----
         function autoLoadFromRepo() {
             if (!state.mapLoaded) {
-                console.log('⏳ 地图未加载完成，稍后重试...');
                 setTimeout(autoLoadFromRepo, 500);
                 return;
             }
             const hasLocalData = localStorage.getItem(storageKey(state.currentMapId));
-            if (hasLocalData && state.markers.length > 0) {
-                console.log('📂 已有本地标记数据，跳过自动加载');
-                return;
-            }
+            if (hasLocalData && state.markers.length > 0) return;
             const jsonUrl = 'https://gh-proxy.org/https://raw.githubusercontent.com/lTwTlol/silverpalace-map.github.io/main/map_editor_state.json';
-            console.log('📂 自动从仓库加载:', jsonUrl);
             fetch(jsonUrl)
                 .then(response => {
                     if (!response.ok) throw new Error('HTTP ' + response.status);
                     return response.json();
                 })
                 .then(data => {
-                    console.log('✅ 成功加载仓库数据:', data);
                     if (importMarkers(data, true)) {
                         showToast('✅ 已从仓库加载标记数据', 2000);
                     }
                 })
-                .catch(err => {
-                    console.log('ℹ️ 仓库中没有 map_editor_state.json，跳过自动加载');
-                });
+                .catch(err => { /* ignore */ });
         }
 
         // ============================================================
-        //  导入 / 导出标记数据
+        //  导入 / 导出
         // ============================================================
 
         function exportMarkers() {
@@ -1716,35 +1762,14 @@
                         return false;
                     }
                 }
-                if (data.mapWidth && data.mapHeight) {
-                    if (data.mapWidth !== state.mapWidth || data.mapHeight !== state.mapHeight) {
-                        console.warn('⚠️ 地图尺寸不匹配，标记位置可能偏移');
-                        if (!silent) {
-                            if (!confirm(`⚠️ 地图尺寸不匹配 (数据: ${data.mapWidth}x${data.mapHeight}, 当前: ${state.mapWidth}x${state.mapHeight})\n\n标记位置可能不准确，继续吗？`)) {
-                                return false;
-                            }
-                        }
-                    }
-                }
                 state.markers = data.markers.map(m => ({
                     ...m,
                     x: clamp(m.x || 0, 0, state.mapWidth),
                     y: clamp(m.y || 0, 0, state.mapHeight),
                 }));
                 state.nextId = data.nextId || Math.max(...state.markers.map(m => m.id), 0) + 1;
-                if (data.labelCustomized) {
-                    state.labelCustomized = data.labelCustomized;
-                } else {
-                    state.labelCustomized = {};
-                    for (const m of state.markers) {
-                        state.labelCustomized[m.id] = false;
-                    }
-                }
-                if (data.hiddenTypes) {
-                    state.hiddenTypes = data.hiddenTypes;
-                } else {
-                    state.hiddenTypes = {};
-                }
+                state.labelCustomized = data.labelCustomized || {};
+                state.hiddenTypes = data.hiddenTypes || {};
                 renderMarkers();
                 saveMarkers();
                 if (!silent) showToast(`✅ 成功导入 ${state.markers.length} 个标记`, 2000);
@@ -1756,7 +1781,6 @@
             }
         }
 
-        // ---- 切换地图 ----
         function switchMap(mapId) {
             if (!mapId) {
                 state.mapLoaded = false;
@@ -1777,9 +1801,7 @@
             }
         }
 
-        // ---- 更新地图选择器 ----
         function updateMapSelector() {
-            const currentValue = mapSelector.value;
             mapSelector.innerHTML = '<option value="">-- 选择地图 --</option>';
             for (const m of state.maps) {
                 const opt = document.createElement('option');
@@ -1791,7 +1813,6 @@
             mapCount.textContent = state.maps.length + ' 张';
         }
 
-        // ---- 标记数据持久化 ----
         function saveMarkers() {
             if (!state.mapLoaded || !state.currentMapId) return;
             try {
@@ -1815,10 +1836,8 @@
                 state.nextId = data.nextId || 1;
                 state.markers = state.markers.filter(m => m.x >= 0 && m.x <= state.mapWidth && m.y >= 0 && m.y <= state
                     .mapHeight);
-                const customRaw = localStorage.getItem(labelCustomizedKey(state.currentMapId));
-                state.labelCustomized = customRaw ? JSON.parse(customRaw) : {};
-                const hiddenRaw = localStorage.getItem(hiddenTypesKey(state.currentMapId));
-                state.hiddenTypes = hiddenRaw ? JSON.parse(hiddenRaw) : {};
+                state.labelCustomized = JSON.parse(localStorage.getItem(labelCustomizedKey(state.currentMapId)) || '{}');
+                state.hiddenTypes = JSON.parse(localStorage.getItem(hiddenTypesKey(state.currentMapId)) || '{}');
                 renderMarkers();
             } catch (e) { /* ignore */ }
         }
@@ -1958,7 +1977,6 @@
             closeEditPanel();
         }
 
-        // ---- 切换 found 状态 ----
         function toggleFound(id) {
             const m = state.markers.find(m => m.id === id);
             if (!m) return;
@@ -2193,19 +2211,6 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') { closeEditPanel();
                 contextMenu.style.display = 'none'; }
-            // PgUp: 展开面板, PgDn: 收起面板
-            if (e.key === 'PageUp') {
-                e.preventDefault();
-                markerListPanel.classList.remove('collapsed');
-                listToggleBtn.textContent = '◀';
-                listToggleBtn.title = '收起 (PgDn)';
-            }
-            if (e.key === 'PageDown') {
-                e.preventDefault();
-                markerListPanel.classList.add('collapsed');
-                listToggleBtn.textContent = '▶';
-                listToggleBtn.title = '展开 (PgUp)';
-            }
         });
 
         // ---- 工具栏按钮 ----
@@ -2352,12 +2357,14 @@
             }
         });
 
-        // ---- 标记列表面板切换按钮 ----
-        listToggleBtn.addEventListener('click', () => {
+        // ---- 标记列表面板切换 (手柄) ----
+        function togglePanel() {
             const isCollapsed = markerListPanel.classList.toggle('collapsed');
-            listToggleBtn.textContent = isCollapsed ? '▶' : '◀';
-            listToggleBtn.title = isCollapsed ? '展开 (PgUp)' : '收起 (PgDn)';
-        });
+            // 手柄的箭头方向由 CSS 控制 (通过 ~ 兄弟选择器)
+            // 不需要额外操作
+        }
+
+        panelHandle.addEventListener('click', togglePanel);
 
         // ---- 窗口自适应 ----
         let resizeTimer = null;
@@ -2374,6 +2381,8 @@
                     updateTransform();
                     renderMarkers();
                 }
+                // 更新手柄位置 (响应式宽度变化)
+                // 手柄的 right 值由 CSS 控制，无需额外操作
             }, 200);
         });
 
@@ -2383,8 +2392,8 @@
 
         state.showLabels = true;
         console.log('🗺️ 白银之城标记工具');
-        console.log('✨ 优化: 鼠标悬停显示标签 | 右侧标记列表 (PgUp/PgDn)');
-        console.log('📌 点击列表项可隐藏/显示对应类型标记');
+        console.log('✨ 优化: 鼠标悬停显示标签 | 手柄在面板左侧边缘外侧');
+        console.log('📌 标记列表显示用户自定义标签 | 点击列表项隐藏/显示对应类型');
 
         loadAllMapsData().then(savedMaps => {
             if (savedMaps && savedMaps.length > 0) {
